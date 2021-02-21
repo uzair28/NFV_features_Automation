@@ -1,7 +1,7 @@
 import requests
 import json
 import os
-
+import logging
 def create_network(network_id,mtu_size,subnet_name,cidr,token):
     ##### Creating Network ########
     payload= {

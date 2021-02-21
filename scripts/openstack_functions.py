@@ -1,27 +1,42 @@
 import requests
 import json
 import os
+import logging
+
+def send_get_request(api_url, token, header='application/json'):
+   response= requests.post(api_url, headers={'content-type': header, 'X-Auth-Token': token}) 
+
+def send_put_request(api_url, token, payload, header='application/json'):
+    response= requests.put(api_url, headers = {'content-type':header, 'X-Auth-Token': token}, data=json.dumps(payload))
+
+def send_post_request(api_url, token, payload, header='application/json'):
+    response= requests.post(api_url, headers = {'content-type':header, 'X-Auth-Token': token}, data=json.dumps(payload))
+
+def parse_json_to_search_resource(data, resource_name, resource_key, resource_value, return_key):
+    data= data.json()
+    for res in (data[resource_name]):
+        if resource_value in (res[resource_key]):
+            logging.warning("{} {} already exists".format(resource_key), resource_name)
+            return res[return_key]
+
+
+def get_authentication_token(keystone_ep, username, password):
+    #authenticate user with keystone
+    logging.debug("authenticating user")
+    response= send_post_request("{}/auth/tokens".format(keystone_ep))
+    logging.info("successfully authenticated") if response.ok else response.raise_for_status()
+    return response.headers.get('X-Subject-Token')
 
 
 
 def search_network(neutron_ep, token, network_name):
-    network_id= None
-    res = requests.get(neutron_ep+'/v2.0/networks',
-                        headers={'content-type': 'application/json',
-                            'X-Auth-Token': token})
-    if res.ok:
-        print("Successfully Received Networks List")
-        data= res.json()
-        for network in (data["networks"]):
-            if network_name in (network["name"]):
-                network_id=network["id"]
-        else :
-            res.raise_for_status()
-    return network_id
-
+    #get list of networks
+    response= send_get_request("{}/v2.0/network".format(neutron_ep), token)
+    logging.info("Successfully Received Networks List") if response.ok else response.raise_for_status()
+    return parse_json_to_search_resource(response, "networks", "name", network_name, "id")
+    
 def create_network(neutron_ep, token, network_name, mtu_size, network_provider_type, is_external):
     #Create Network
-    network_id= None
     payload= {
         "network": {
             "name": network_name,
@@ -31,37 +46,20 @@ def create_network(neutron_ep, token, network_name, mtu_size, network_provider_t
             "router:external": is_external
             }
         }
-    res= requests.post(neutron_ep+'/v2.0/networks',
-                            headers={'content-type': 'application/json',
-                                'X-Auth-Token': token},
-                            data=json.dumps(payload))
-    if res.ok:
-        print("Successfully Created Network "+network_name)
-        data= res.json()
-        network_id= data['network']['id']
-    else :
-        res.raise_for_status()
-    return network_id
+    response= send_post_request('{}/v2.0/networks'.format(neutron_ep), token, payload)
+    logging.info("Successfully Created Network {}".format(network_name)) if response.ok else response.raise_for_status()
+    data=response.json()
+    return data['network']['id']
+
 
 def search_subnet(neutron_ep, token, subnet_name):
-    #Search Subnet
-    subnet_id= None
-    res = requests.get(neutron_ep+'/v2.0/subnets',
-                        headers={'content-type': 'application/json',
-                            'X-Auth-Token': token})
-    if res.ok:
-        data= res.json()
-        for subnet in (data["subnets"]):
-            if subnet_name in (subnet["name"]):
-                print("Subnet"+ (subnet["name"]) +" already exists")
-                subnet_id= subnet["id"]
-    else: 
-        res.raise_for_status()
-    return subnet_id
+    #get list of subnets
+    response= send_get_request("{}/v2.0/subnets".format(neutron_ep), token)
+    logging.info("Successfully Received Subnet List") if response.ok else response.raise_for_status()
+    return parse_json_to_search_resource(response, "subnets", "name", subnet_name, "id")
 
 def create_subnet(neutron_ep, token, subnet_name, network_id, cidr):
     #creating Subnet
-    subnet_id= None
     payload= {
         "subnet": {
             "name": subnet_name,
@@ -70,23 +68,14 @@ def create_subnet(neutron_ep, token, subnet_name, network_id, cidr):
             "cidr": cidr
             }
         }
-    
-    res = requests.post(neutron_ep+'/v2.0/subnets',
-                            headers={'content-type': 'application/json',
-                                'X-Auth-Token': token},
-                            data=json.dumps(payload))
-    if res.ok:
-        print("Successfully Created Subnet  "+ (subnet_name))
-        data= res.json()
-        subnet_id= data['subnet']['id']
-    else :
-        res.raise_for_status()
-    return subnet_id
+    response= send_post_request("{}/v2.0/subnets".format(neutron_ep), token, payload)
+    logging.info("successfully created subnet") if response.ok else response.raise_for_status()
+    data= response.json()
+    return data['subnet']['id']
 
 def create_subnet(neutron_ep, token, subnet_name, network_id, cidr, gateway, pool_start, pool_end):
-    subnet_id= None
     payload= {"subnet":
-              {"network_id": network_id,
+            {"network_id": network_id,
               "ip_version": 4,
               "cidr": cidr,
                "name": subnet_name,
@@ -95,36 +84,20 @@ def create_subnet(neutron_ep, token, subnet_name, network_id, cidr, gateway, poo
                "allocation_pools": [{"start": pool_start, "end": pool_end}]
               }
               }
-    res = requests.post(neutron_ep+'/v2.0/subnets',
-                            headers={'content-type': 'application/json',
-                                'X-Auth-Token': token},
-                            data=json.dumps(payload))
-    if res.ok:
-        print("Successfully Created External Subnet  "+ (subnet_name))
-        data= res.json()
-        subnet_id= data['subnet']['id']
-    else :
-            res.raise_for_status()
-    return subnet_id
+    response= send_post_request("{}/v2.0/subnets".format(neutron_ep), token, payload)
+    logging.info("successfully created subnet") if response.ok else response.raise_for_status()
+    data= response.json()
+    return data['subnet']['id']
+
 
 def search_flavor(nova_ep, token, flavor_name):
-    # List flavors
-    flavor_id= None
-    res = requests.get(nova_ep+'/v2/flavors',
-                        headers={'content-type': 'application/json',
-                            'X-Auth-Token': token})
-    if res.ok:
-        data= res.json()
-        for flavor in (data["flavors"]):
-            if flavor in (flavor["name"]):
-                flavor_id= flavor["id"]
-    else:
-        res.raise_for_status()
-    return flavor_id
+    # get list of flavors
+    response= send_get_request("{}/v2/flavors".format(nova_ep), token)
+    logging.info("Successfully Received Subnet List") if response.ok else response.raise_for_status()
+    return parse_json_to_search_resource(response, "flavours", "name", flavor_name, "id")
 
 def create_flavor(nova_ep, token, flavor_name, flavor_ram, flavor_vcpus, flavor_disks):
     # Create Flavora
-    flavor_id= None
     payload={
         "flavor": {
             "name": flavor_name,
@@ -135,17 +108,10 @@ def create_flavor(nova_ep, token, flavor_name, flavor_ram, flavor_vcpus, flavor_
             "os-flavor-access:is_public": "true"
         }
     }
-    res = requests.post(nova_ep+'/flavors',
-                    headers={'content-type': 'application/json',
-                             'X-Auth-Token':  token},
-                    data=json.dumps(payload))
-    if res.ok:
-        print("Successfully Created Flavor "+ flavor_name)
-        data= res.json()
-        flavor_id= data['flavor']['id']
-    else :
-        res.raise_for_status()
-    return flavor_id
+    response= send_post_request("{}/v2.0/flavors".format(nova_ep), token, payload)
+    logging.info("successfully created flavor") if response.ok else response.raise_for_status()
+    data= response.json()
+    return data['flavor']['id']
 
 def put_extra_specs_in_flavor(nova_ep, token, flavor_id, mem_page_size):
     payload={
@@ -164,74 +130,37 @@ def put_extra_specs_in_flavor(nova_ep, token, flavor_id, mem_page_size):
             }
         }
     }
-    res = requests.put(nova_ep+'/flavors/'+flavor_id,
-                    headers={'content-type': 'application/json',
-                             'X-Auth-Token':  token},
-                    data=json.dumps(payload))
-    if res.ok:
-        print("Successfully Added Extra specs to  Flavor "+ flavor_id)
-    else :
-        res.raise_for_status()
+    response= send_post_request("{}/v2.0/flavors/{}".format(nova_ep, flavor_id), token, payload)
+    logging.info("Successfully Added Extra specs to  Flavor {}".format(flavor_id)) if response.ok else response.raise_for_status()
 
 
 
 def create_router(neutron_ep, token, router_name):
-    router_id= None
     payload={"router":
         {"name": router_name,
         "admin_state_up":" true",
         }
         }
-    res = requests.post(neutron_ep+'/v2.0/routers',
-                   headers={'content-type': 'application/json',
-                             'X-Auth-Token':  token   },
-                  data=json.dumps(payload))
-
-    if res.ok:
-        print("Successfully Created Router "+router_name)
-        data= res.json()
-        router_id= data['router']['id']
-    else :
-        res.raise_for_status()
-    return router_id
-
+    response= requests.post('{}/v2.0/routers'.format(neutron_ep), token, payload)
+    logging.info("Successfully Created Router {}".format(router_name)) if response.ok else response.raise_for_status()  
+    data= response.json()
+    return data['router']['id']
+    
 def search_security_group(neutron_ep, token, security_group_name):
-    security_group_id= None
-    res = requests.get(neutron_ep+"/v2.0/security-groups",
-                    headers={'content-type': 'application/json',
-                             'X-Auth-Token':  token })
-    if res.ok:
-        print("Successfully Received Security Group List")
-        data= res.json()
-        for security_group in data["security_groups"]:
-            if security_group["name"] == security_group_name:
-                print("Security Group Already Exists")
-                security_group_id= security_group["id"]
-    else :
-        res.raise_for_status()
-    return security_group_id
-
+    response= send_get_request("{}//v2.0/security-groups", token)
+    logging.info("Successfully Received Security Group List") if response.ok else response.raise_for_status()
+    return parse_json_to_search_resource(response, "security_groups", "name", security_group_name, "id")
 
 def create_security_group(neutron_ep, token, security_group_name):
-    security_group_id= None
     payload= {
     "security_group": {
         "name": security_group_name,
     }
     }
-    res = requests.post(neutron_ep+'/v2.0/security-groups',
-                  headers={'content-type': 'application/json',
-                            'X-Auth-Token':  token},
-                data= json.dumps(payload))
-
-    if res.ok:
-        print("Successfully Created Security Group "+security_group_name)
-        data= res.json()
-        security_group_id= data["security_group"]["id"]
-    else :
-        res.raise_for_status()
-
-    return security_group_id
+    response = send_post_request('{}/v2.0/security-groups'.format(neutron_ep), token, payload)
+    logging.info("Successfully Created Security Group {}".format(security_group_name)) if response.ok else response.raise_for_status()
+    data= response.json()
+    return data["security_group"]["id"]
 
 def add_rule_to_security_group(neutron_ep, token, security_group_id, direction, ip_version, protocol, min_port, max_port):
     payload= {"security_group_rule":{
@@ -244,99 +173,47 @@ def add_rule_to_security_group(neutron_ep, token, security_group_id, direction, 
             "port_range_max": max_port
         }
     }
-    res = requests.post(neutron_ep+'/v2.0/security-group-rules',
-                   headers={'content-type': 'application/json',
-                             'X-Auth-Token':  token},
-                data= json.dumps(payload)
-                )
-    if res.ok:
-        print("Successfully added ICMP rule to Security Group ")
-    else :
-        res.raise_for_status()
-    ### i = next((elem for elem in my_list if elem == 'two'), None)
+    response= send_post_request('{}/v2.0/security-group-rules'.format(neutron_ep), token, payload)
+    logging.info("Successfully added ICMP rule to Security Group ") else response.raise_for_status()
 
-def search_keypair(neutron_ep, token, keypair_name):
-    
-    res = requests.get(nova_ep+'/os-keypairs',
-                    headers={'content-type': 'application/json',
-                             'X-Auth-Token':  token   })                   
-    if res.ok:
-        print("Successfully Received Flavours List")
-        data= res.json()
-        for keypair in data["keypairs"]:
-            if keypair["keypair"]["name"] == keypair_name:
-                keypair_key= keypair["keypair"]["public_key"]
-                print("KeyPair "+keypair_name+" Already Exists")
-        
-    else:
-        res.raise_for_status()
+def search_keypair(nova_ep, token, keypair_name):
+    response= send_get_request("{}/os-keypairs".format(nova_ep), token)
+    logging.info("successfully received keypair list") if response.ok else response.raise_for_status()
+    return parse_json_to_search_resource(response, "keypairs", "name", keypair_name, "public_key")
 
 def create_keypair(nova_ep, token, keypair_name):
-    public_key= None
     payload={"keypair":
         {"type": "ssh",
         "name": keypair_name
         }
         }
-    res = requests.post(nova_ep+'/os-keypairs',
-                 headers={'content-type': 'application/json',
-                            'X-Auth-Token':  token},
-                data= json.dumps(payload))
-    if res.ok:
-        print("Successfully Created Keypair")
-        data= res.json()
-        public_key= data["keypair"]["public_key"]
-        
-    else :
-        res.raise_for_status()
-    
-    return public_key
+    response = send_post_request('{}/os-keypairs'.format(nova_ep), token, payload)
+    logging.info("successfully created keypair {}".format(keypair_name)) if response.ok else response.raise_for_status()
+    data= response.json()
+    return data["security_group"]["id"]
+
 
 def search_image(glance_ep, token, image_name):
-    # Get Images
-    image_id= None
-    res = requests.get(glance_ep+'/v2/images',
-                        headers={'content-type': 'application/json',
-                            'X-Auth-Token': token})
-    if res.ok:
-        data= res.json()
-        for image in (data["images"]):
-            if image in (data["name"]):
-                image_id= data["id"]
-                print("image",(image["name"]) +" already exists")
-    else:
-        res.raise_for_status()
-    return image_id
+    response= send_get_request("{}/v2/images".format(glance_ep), token)
+    logging.info("successfully received images list") if response.ok else response.raise_for_status()
+    return parse_json_to_search_resource(response, "images", "name", image_name, "id")
+
 def create_image(glance_ep, token, image_name, container_format, disk_format, image_visibility):
-    image_id= None
     payload ={
         "container_format": container_format,
         "disk_format":disk_format,
         "name": image_name,
         "visibility":  image_visibility,
     }
-    res = requests.post(glance_ep+ '/v2.1/images',
-                    headers={'content-type': 'application/json',
-                             'X-Auth-Token':  token   }, 
-                             data=json.dumps(payload))
-    if res.ok:
-        print("Image Created")
-        data= res.json()
-        image_id= data["image"]["id"]
-    else:
-        res.raise_for_status()
-    return image_id
+    response = send_post_request('{}/v2/images'.format(glance_ep), token, payload)
+    logging.info("successfully created image {}".format(image_name)) if response.ok else response.raise_for_status()
+    data= response.json()
+    return data["image"]["id"]
 
 def upload_file_to_image(glance_ep, token, image_file, image_id):
     #image_file= open("cirros-0.5.1-x86_64-disk.img", "r")
-    res = requests.put(glance_ep+'/v2.1/images/'+image_id+'/file',
-                    headers={'content-type': 'application/octet-stream',
-                             'X-Auth-Token':  token   }, 
-                             data=image_file)
-    if res.ok:
-        print("File GIven to Image")
-    else:
-        res.raise_for_status()
+    response = send_put_request('{}/v2/images/{}/file'.format(glance_ep, image_id), token, image_file, 'application/octet-stream')
+    logging.info("successfully uploaded to image") if response.ok else response.raise_for_status()
 
 
 def attach_volume(instance_name,vol_name,project_id,token):
@@ -379,62 +256,37 @@ def attach_volume(instance_name,vol_name,project_id,token):
                 res.raise_for_status()
 
 def create_server(nova_ep, token, server_name, image, keypair_name, flavor,  network, security_group):
-    server_url= None
     payload= {"server": {"name": server_name, "imageRef": image,
         "key_name": keypair_name, "flavorRef": flavor_id, 
         "max_count": 1, "min_count": 1, "networks": [{"uuid": network}], 
         "security_groups": [{"name": security_group}]}}   
-    res = requests.post(nova_ep+ '/servers',
-                   headers={'content-type': 'application/json',
-                             'X-Auth-Token':  token},
-                  data=json.dumps(payload))
+    response = send_post_request('{}/servers'.format(nova_ep), token, payload)
+    logging.info("successfully created server {}".format(server_name)) if response.ok else  response.raise_for_status()
+    data= response.json()
+    return data["server"]["links"][0]["href"]  
 
-    if res.ok:
-        print("Successfully Created Server "+ server_name)
-        data= res.json()
-        server_url= data["server"]["links"][0]["href"]  
-    else :
-        res.raise_for_status()
-    return server_url
+def get_server_detail(nova_ep, token, server_url):
+    response = send_get_request("{}/servers/{}".format(nova_ep, server_url), token)
+    print("Successfully Received Server Details") if response.ok else response.raise_for_status()
+    data= response.json()
+    return data["server"]["id"]
 
-    def get_server_detail(nova_ep, token, server_url):
-        server_id= None
-        res = requests.get(server_url,
-                   headers={'content-type': 'application/json',
-                             'X-Auth-Token':  token   },
-                  data=json.dumps(payload))
-        if res.ok:
-            print("Successfully Received Server Details")
-            data= res.json()
-            server_id= data["server"]["id"]
-        else:
-            res.raise_for_status()
-        return server_id 
 
 def check_server_status(nova_ep, token, server_id):
-    server_status= None
-    res = requests.get(nova_ep+ '/servers/'+server_id,
-                   headers={'content-type': 'application/json',
-                             'X-Auth-Token':  token   })
-    if not res.ok:
-        res.raise_for_status()
-    else: 
-        data= res.json()
-        server_status= data["server"]["OS-EXT-STS:vm_state"]
-    
-    return server_status
+    response = send_get_request("{}/servers/{}".format(nova_ep, server_id), token)
+    data= response.json()
+    return data["server"]["OS-EXT-STS:vm_state"] if response.ok else response.raise_for_status()
 
-def get_server_ip(server, network):
-    res = requests.get(nova_ep+ '/servers/'+server,
-                   headers={'content-type': 'application/json',
-                             'X-Auth-Token':  token   },
-                  data=json.dumps(payload))
-    if not res.ok:
-        res.raise_for_status()
-    data= res.json()
-    for networks in data["server"]["addresses"][str(network)]:
-        if networks["OS-EXT-IPS:type"] == "fixed":
-            return networks["addr"]
+def get_server_ip(nova_ep, token, server_id, network):
+    response = send_get_request('{}/servers/{}'.format(nova_ep, server_id), token)
+    if not response.ok:
+        response.raise_for_status()
+    else: 
+        data= response.json()
+        for networks in data["server"]["addresses"][str(network)]:
+            if networks["OS-EXT-IPS:type"] == "fixed":
+                return networks["addr"]
+
 def get_server_floating_ip(server, network):
     ip=""
     res = requests.get(nova_ep+ '/servers/'+server,

@@ -1,13 +1,17 @@
-import requests
 import json
 import os
 import sys
-from scripts.openstack_functions import *
+import requests
+from openstack_functions import *
 import argparse
 import logging
+#filename=time.strftime("%d-%m-%Y-%H-%M-%S")+".log"
+logging.basicConfig(level=logging.DEBUG, filename= "logs.log", filemode="w", format='%(asctime)s %(levelname)s: %(message)s')
+logging = logging.getLogger("TestCase Logger")
 
 def parse_arguments():
-# Verify Arguments
+    # parse arguments
+    logging.info("Parsing Arguments")
     parser = argparse.ArgumentParser(description='Pass settings file, feature and deployment type for test cases')
     parser.add_argument('-s', '--settings',
                         help=' settings file',
@@ -18,43 +22,21 @@ def parse_arguments():
     parser.add_argument('-d', '--deployment',
                         help='deployment type, flex or ceph',
                         required=True)
-    return parser.parse_args()
+    return parser.parse_known_args()
 
 def read_settings(settings_file):
     #read settings from json file
-    settings= None
-    if os.path.exists(settings_file):
+    try os.path.exists(settings_file):
         try:
-            data=""
             with open(settings_file, 'r') as file:
                  data = file.read().replace('\n', '')
             settings= json.loads(data)
-
         except Exception as e:
-            print("Failed to load settings file")
-            print(e)
-    else:
-        print("File not found!!! Exception Occurred ")
+            logging.exception("Failed to load settings file")
+    except(FileNotFoundError, IOError):
+        logging.exception("File not found")
     return settings
 
-def get_authentication_token(username, password, keystone_ep):
-    #authenticate user with keystone
-    token=""
-    payload= {"auth": {"identity": {"methods": ["password"],"password":
-                      {"user": {"name": username, "domain": {"name": "Default"},"password": password} }},
-                "scope": {"project": {"domain": {"id": "default"},"name": "admin"}}}}
-    # Request Api for authentication
-    res = requests.post(keystone_ep+'/auth/tokens',
-                        headers = {'content-type':'application/json'},
-                        data=json.dumps(payload))
-    #Validate Response
-    if res.ok:
-        print("Successfully Authenticated")
-        token= res.headers.get('X-Subject-Token')
-    else:
-        print("Authenticated Failed")
-        res.raise_for_status()
-    return token
 
 def setup_environment(keypair_name, security_group_name, token):
     #Basic Environment Setup
@@ -68,15 +50,30 @@ def setup_environment(keypair_name, security_group_name, token):
 
 def main():
     #Parse Arguments
-    arguments= parse_arguments()
+    try:
+        arguments, unknown= parse_arguments()
+        if len(unknown) > 0:
+        parser.print_help()
+        msg = "Invalid argument(s) :"
+        for each in unknown:
+            msg += " " + each + ";"
+        raise AssertionError(msg)
+    
+    except:
+        logging.exception("error parsing arguments")
 
     #Validate Arguments
+    
+    logging.info("validating arguments")
     if arguments.feature != "numa":
-        raise ValueError("Invalid Argument "+ arguments.feature)
+        logging.critical("Invalid Argument {}".format(arguments.feature))
+        raise ValueError("Invalid Argument {}".format(arguments.feature))
     if arguments.deployment != "ceph":
-        raise ValueError("Invalid Argument "+ arguments.feature)
+        logging.critical("Invalid Argument {}".format(arguments.feature))
+        raise ValueError("Invalid Argument {}".format(arguments.feature))
 
     #Read Settings File
+    logging.info("Reading settings from file")
     settings= read_settings(arguments.settings)
 
     #Create Endpoints
@@ -84,6 +81,7 @@ def main():
     #neutron_ep=
 
     #Get Authentication token
+    logging.info("athenticationg user")
     token= get_authentication_token(settings["username"], settings["password"], keystone_ep )
     
 
