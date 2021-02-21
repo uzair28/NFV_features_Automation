@@ -2,8 +2,9 @@ import requests
 import json
 import os
 import sys
-#from automation_code import *
+from scripts.openstack_functions import *
 import argparse
+import logging
 
 def parse_arguments():
 # Verify Arguments
@@ -12,7 +13,7 @@ def parse_arguments():
                         help=' settings file',
                         required=True)
     parser.add_argument('-f', '--feature',
-                        help='features enabled in deplyment',
+                        help='features enabled in deployment',
                         required=True)
     parser.add_argument('-d', '--deployment',
                         help='deployment type, flex or ceph',
@@ -21,7 +22,7 @@ def parse_arguments():
 
 def read_settings(settings_file):
     #read settings from json file
-    settings=""
+    settings= None
     if os.path.exists(settings_file):
         try:
             data=""
