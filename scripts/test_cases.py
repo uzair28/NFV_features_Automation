@@ -5,6 +5,7 @@ import requests
 from openstack_functions import *
 import argparse
 import logging
+
 #filename=time.strftime("%d-%m-%Y-%H-%M-%S")+".log"
 logging.basicConfig(level=logging.DEBUG, filename= "logs.log", filemode="w", format='%(asctime)s %(levelname)s: %(message)s')
 logging = logging.getLogger("TestCase Logger")
@@ -26,12 +27,12 @@ def parse_arguments():
 
 def read_settings(settings_file):
     #read settings from json file
-    try os.path.exists(settings_file):
-        try:
+    try: os.path.exists(settings_file)
+    try:
             with open(settings_file, 'r') as file:
                  data = file.read().replace('\n', '')
             settings= json.loads(data)
-        except Exception as e:
+    except Exception as e:
             logging.exception("Failed to load settings file")
     except(FileNotFoundError, IOError):
         logging.exception("File not found")
@@ -53,8 +54,7 @@ def main():
     try:
         arguments, unknown= parse_arguments()
         if len(unknown) > 0:
-        parser.print_help()
-        msg = "Invalid argument(s) :"
+            msg = "Invalid argument(s) :"
         for each in unknown:
             msg += " " + each + ";"
         raise AssertionError(msg)
