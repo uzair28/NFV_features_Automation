@@ -3,12 +3,15 @@ import os
 import sys
 import requests
 from openstack_functions import *
+from numa import *
 import argparse
 import logging
 
 #filename=time.strftime("%d-%m-%Y-%H-%M-%S")+".log"
-logging.basicConfig(level=logging.DEBUG, filename= "logs.log", filemode="w", format='%(asctime)s %(levelname)s: %(message)s')
+#filename= "logs.log", filemode="w",
+logging.basicConfig(level=logging.INFO,  format='%(asctime)s %(levelname)s: %(message)s', stream=sys.stdout)
 logging = logging.getLogger("TestCase Logger")
+
 
 def parse_arguments():
     # parse arguments
@@ -23,18 +26,18 @@ def parse_arguments():
     parser.add_argument('-d', '--deployment',
                         help='deployment type, flex or ceph',
                         required=True)
-    return parser.parse_known_args()
+    return parser.parse_args()
 
 def read_settings(settings_file):
     #read settings from json file
-    try: os.path.exists(settings_file)
-    try:
+    if os.path.exists(settings_file):
+        try:
             with open(settings_file, 'r') as file:
                  data = file.read().replace('\n', '')
             settings= json.loads(data)
-    except Exception as e:
+        except Exception as e:
             logging.exception("Failed to load settings file")
-    except(FileNotFoundError, IOError):
+    else:
         logging.exception("File not found")
     return settings
 
@@ -49,16 +52,20 @@ def setup_environment(keypair_name, security_group_name, token):
     image_verify(settings["image"],token)
     flavor_verify(settings["flavor"],token)
 
+def numa_test_cases(nova_ep, neutron_ep, glance_ep, token, settings):
+    numa_test_case_3(nova_ep, neutron_ep, glance_ep, token, settings)
+
 def main():
+   
     #Parse Arguments
     try:
-        arguments, unknown= parse_arguments()
-        if len(unknown) > 0:
-            msg = "Invalid argument(s) :"
-        for each in unknown:
-            msg += " " + each + ";"
-        raise AssertionError(msg)
-    
+        arguments= parse_arguments()
+        #arguments, unknown= parse_arguments()
+        #if len(unknown) > 0:
+         #   msg = "Invalid argument(s) :"
+        #for each in unknown:
+         #   msg += " " + each + ";"
+        #raise AssertionError(msg)
     except:
         logging.exception("error parsing arguments")
 
@@ -69,8 +76,8 @@ def main():
         logging.critical("Invalid Argument {}".format(arguments.feature))
         raise ValueError("Invalid Argument {}".format(arguments.feature))
     if arguments.deployment != "ceph":
-        logging.critical("Invalid Argument {}".format(arguments.feature))
-        raise ValueError("Invalid Argument {}".format(arguments.feature))
+        logging.critical("Invalid Argument {}".format(arguments.deployment))
+        raise ValueError("Invalid Argument {}".format(arguments.deployment))
 
     #Read Settings File
     logging.info("Reading settings from file")
@@ -78,15 +85,26 @@ def main():
 
     #Create Endpoints
     keystone_ep= settings["dashboard_ip"]+":5000/v3"
+    neutron_ep= settings["dashboard_ip"]+":9696"
+    cinder_ep= settings["dashboard_ip"]+":8776"
+    nova_ep= settings["dashboard_ip"]+":8774"
+    glance_ep=""
     #neutron_ep=
 
     #Get Authentication token
-    logging.info("athenticationg user")
-    token= get_authentication_token(settings["username"], settings["password"], keystone_ep )
+    logging.info("auhenticating user")
+    token= get_authentication_token(keystone_ep, settings["username"], settings["password"]  )
+    print("Token Received") 
+    logging.info("Glance endpoint {}".format(glance_ep))   
+    logging.info("Neutron endpoint {}".format(neutron_ep))  
+    logging.info("Cinder endpoint {}".format(cinder_ep))  
+    logging.info("Nova endpoint {}".format(nova_ep))  
+
     
 
-    #Setup basic Environment
-
+    #Run Test Cases
+    if arguments.feature == "numa":
+        numa_test_cases(nova_ep, neutron_ep, glance_ep, token, settings) 
 
 if __name__ == "__main__":
     main()
