@@ -214,19 +214,23 @@ def create_image(nova_ep, token, image_name, container_format, disk_format, imag
         "name": image_name,
         "visibility":  image_visibility,
     }
-
-    response = send_post_request("{}/v2/images".format(nova_ep), token, payload)
+    response = send_post_request("{}/v2.1/images".format(nova_ep), token, payload)
     logging.info("successfully created image {}".format(image_name)) if response.ok else response.raise_for_status()
     data= response.json()
     return data["id"]
 
 def upload_file_to_image(nova_ep, token, image_file, image_id):
     #image_file= open("cirros-0.5.1-x86_64-disk.img", "r")
-    response = send_put_request("{}/v2/images/{}/file".format(nova_ep, image_id), token, image_file, "application/octet-stream")
+    response = send_put_request("{}/v2.1/images/{}/file".format(nova_ep, image_id), token, image_file, "application/octet-stream")
     logging.info("successfully uploaded to image") if response.ok else response.raise_for_status()
 
+def receive_all_server(nova_ep, token):
+    response= send_get_request("{}/v2.1/servers/detail".format(nova_ep), token)
+    logging.info("successfully received server list") if response.ok else response.raise_for_status()
+    return response.json()
+
 def search_server(nova_ep, token, server_name):
-    response= send_get_request("{}v2.1/servers/".format(nova_ep), token)
+    response= send_get_request("{}/v2.1/servers".format(nova_ep), token)
     logging.info("successfully received server list") if response.ok else response.raise_for_status()
     return parse_json_to_search_resource(response, "servers", "name", server_name, "id")
 
@@ -235,7 +239,7 @@ def create_server(nova_ep, token, server_name, image_id, keypair_name, flavor_id
         "key_name": keypair_name, "flavorRef": flavor_id, 
         "max_count": 1, "min_count": 1, "networks": [{"uuid": network_id}], 
         "security_groups": [{"name": security_group_id}]}}   
-    response = send_post_request('{}/2.1/servers'.format(nova_ep), token, payload)
+    response = send_post_request('{}/v2.1/servers'.format(nova_ep), token, payload)
     logging.info("successfully created server {}".format(server_name)) if response.ok else  response.raise_for_status()
     data= response.json()
     return data["server"]["links"][0]["href"]  

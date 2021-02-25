@@ -1,6 +1,8 @@
 from openstack_functions import *
 import logging
 import paramiko
+from hugepages import *
+'''
 def ssh_into_compute_node(conn, command):
     try:
         user_name = "heat-admin"
@@ -36,8 +38,8 @@ def ssh_into_compute_node(conn, command):
         print(e)
         logging.error("Unable to ssh into compute node")
         # conn.delete_server(server_name)
-
-def numa_test_case_3(nova_ep, neutron_ep, glance_ep, token, settings):
+'''
+def numa_test_case_3(nova_ep, neutron_ep, glance_ep, image_ep, token, settings):
     '''
     Test Case Step Description:
         a) Create a Numa flavor
@@ -84,12 +86,12 @@ def numa_test_case_3(nova_ep, neutron_ep, glance_ep, token, settings):
     logging.debug("security group id is: {}".format(subnet_id)) 
 
     #search and create image
-    image_id= search_image(nova_ep, token, settings["image_name"])
+    image_id= search_image(image_ep, token, settings["image_name"])
     if image_id is None:
-        image_id= create_image(nova_ep, token, settings["image_name"], "bare", "qcow2", "public")
+        image_id= create_image(image_ep, token, settings["image_name"], "bare", "qcow2", "public")
         image_file= open(settings["image_file"], 'rb')
         logging.info("Uploading image file")
-        upload_file_to_image(nova_ep, token, image_file, image_id)
+        upload_file_to_image(image_ep, token, image_file, image_id)
         logging.debug("image id is: {}".format(image_id))
     #try:
     #   image_file= open(settings["image_file"], "r")
@@ -101,14 +103,11 @@ def numa_test_case_3(nova_ep, neutron_ep, glance_ep, token, settings):
     if server_1_id is None:
         server_1_url= create_server(nova_ep, token, settings["server_1_name"], image_id,settings["key_name"], flavor_id,  network_id, security_group_id)
         server_1_id= get_server_detail(token, server_1_url)
-    logging.debug("Server 1 id: "+server_1_id)
-
+    logging.debug("Server 1 id: "+server_1_id)    
     
     
-    #Verify Deployment of HP
-    ssh_into_compute_node(token, "")
-
-
+    result= hugepage_test_case_1("nova_ep", "neutron_ep", "glance_ep", "token", "settings")
+    print(result)
 
 
 
