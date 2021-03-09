@@ -4,17 +4,28 @@ import os
 import logging
 
 def send_get_request(api_url, token, header="application/json"):
-    return requests.get(api_url, headers= {'content-type': header, 'X-Auth-Token': token}) 
+    try:
+        return requests.get(api_url, headers= {'content-type': header, 'X-Auth-Token': token}) 
+    except Exception as e:
+        logging.error( "request processing failure ", stack_info=True)
+        print(e)
 
 def send_put_request(api_url, token, payload, header='application/json'):
-    return requests.put(api_url, headers= {'content-type':header, 'X-Auth-Token': token}, data= payload)
+    try:
+       return requests.put(api_url, headers= {'content-type':header, 'X-Auth-Token': token}, data= payload)
+    except Exception as e:
+        logging.error( "request processing failure ", stack_info=True)
+        print(e)
 
 def send_post_request(api_url, token, payload, header='application/json'):
-    return requests.post(api_url, headers= {'content-type':header, 'X-Auth-Token': token}, data=json.dumps(payload))
+    try:
+        return requests.post(api_url, headers= {'content-type':header, 'X-Auth-Token': token}, data=json.dumps(payload))
+    except Exception as e:
+       logging.error( "request processing failure ", stack_info=True)
+       print(e)
 
 def parse_json_to_search_resource(data, resource_name, resource_key, resource_value, return_key):
     data= data.json()
-    
     for res in (data[resource_name]):
         if resource_value in res[resource_key]:
             logging.warning("{} already exists".format(resource_value))
@@ -30,7 +41,7 @@ def get_authentication_token(keystone_ep, username, password):
                       {"user": {"name": username, "domain": {"name": "Default"},"password": password} }},
                 "scope": {"project": {"domain": {"id": "default"},"name": "admin"}}}}
     logging.debug("authenticating user")
-    response= send_post_request("{}/auth/tokens".format(keystone_ep), None, payload)
+    response= send_post_request("{}/v3/auth/tokens".format(keystone_ep), None, payload)
     logging.info("successfully authenticated") if response.ok else response.raise_for_status()
     return response.headers.get('X-Subject-Token')
 def search_network(neutron_ep, token, network_name):
@@ -54,6 +65,13 @@ def create_network(neutron_ep, token, network_name, mtu_size, network_provider_t
     logging.info("successfully created network {}".format(network_name)) if response.ok else response.raise_for_status()
     data=response.json()
     return data['network']['id']
+def search_and_create_network(neutron_ep, token, network_name, mtu_size, network_provider_type, is_external):
+    network_id= search_network(neutron_ep, token, network_name)    
+    if network_id is None:
+        network_id =create_network(neutron_ep, token, network_name, mtu_size, network_provider_type, False)  
+    logging.debug("network id is: {}".format(network_id))
+    return network_id
+
 
 def search_subnet(neutron_ep, token, subnet_name):
     #get list of subnets
@@ -79,6 +97,13 @@ def create_subnet(neutron_ep, token, subnet_name, network_id, cidr, external= Fa
     logging.info("successfully created subnet") if response.ok else response.raise_for_status()
     data= response.json()
     return data['subnet']['id']
+def search_and_create_subnet(neutron_ep, token, subnet_name, network_id, subnet_cidr):
+    subnet_id= search_subnet(neutron_ep, token, subnet_name)    
+    if subnet_id is None:
+        subnet_id =create_subnet(neutron_ep, token, subnet_name, network_id, subnet_cidr) 
+    logging.debug("subnet id is: {}".format(subnet_id)) 
+    return subnet_id
+
 
 def search_flavor(nova_ep, token, flavor_name):
     # get list of flavors
@@ -102,6 +127,13 @@ def create_flavor(nova_ep, token, flavor_name, flavor_ram, flavor_vcpus, flavor_
     logging.info("successfully created flavor") if response.ok else response.raise_for_status()
     data= response.json()
     return data['flavor']['id']
+def search_and_create_flavor(nova_ep, token, flavor_name, ram, vcpu, disks):
+    flavor_id= search_flavor(nova_ep, token, flavor_name)    
+    if flavor_id is None:
+        flavor_id= create_flavor(nova_ep, token, flavor_name, ram, vcpu, disks)   
+    logging.debug("flavor id is: {}".format(flavor_id))
+    return flavor_id
+
 
 def put_extra_specs_in_flavor(nova_ep, token, flavor_id,is_numa, mem_page_size=None):
     #add extra specs to flavors
@@ -162,6 +194,13 @@ def create_security_group(neutron_ep, token, security_group_name):
     data= response.json()
     return data["security_group"]["id"]
 
+def search_and_create_security_group(neutron_ep, token, security_group_name):
+    security_group_id= search_security_group(neutron_ep, token, security_group_name) 
+    if security_group_id is None:
+        security_group_id= create_security_group(neutron_ep, token, security_group_name)
+    logging.debug("security group id is: {}".format(security_group_id)) 
+    return security_group_id
+
 def add_rule_to_security_group(neutron_ep, token, security_group_id, direction, ip_version, protocol, min_port, max_port):
     payload= {"security_group_rule":{
             "direction": direction,
@@ -200,7 +239,12 @@ def create_keypair(nova_ep, token, keypair_name):
     logging.info("successfully created keypair {}".format(keypair_name)) if response.ok else response.raise_for_status()
     data= response.json()
     return data["keypair"]["public_key"]
-
+def search_and_create_kaypair(nova_ep, token, key_name):
+    keypair_public_key= search_keypair(nova_ep, token, key_name)
+    if keypair_public_key is None:
+        keypair_public_key= create_keypair(nova_ep, token, key_name)
+    logging.debug("Keypair public key is: {}".format(keypair_public_key))
+    return keypair_public_key
 
 def search_image(nova_ep, token, image_name):
     response= send_get_request("{}/v2.1/images".format(nova_ep), token)
@@ -218,11 +262,30 @@ def create_image(nova_ep, token, image_name, container_format, disk_format, imag
     logging.info("successfully created image {}".format(image_name)) if response.ok else response.raise_for_status()
     data= response.json()
     return data["id"]
+    
+def get_image_status(nova_ep, token, image_id):
+    response= send_get_request("{}/v2.1/images/{}".format(nova_ep, image_id), token)
+    logging.info("successfully received image status") if response.ok else response.raise_for_status()
+    data= response.json()
+    return(data["status"])
 
-def upload_file_to_image(nova_ep, token, image_file, image_id):
+def upload_file_to_image(image_ep, token, image_file, image_id):
     #image_file= open("cirros-0.5.1-x86_64-disk.img", "r")
-    response = send_put_request("{}/v2.1/images/{}/file".format(nova_ep, image_id), token, image_file, "application/octet-stream")
+    response = send_put_request("{}/v2.1/images/{}/file".format(image_ep, image_id), token, image_file, "application/octet-stream")
     logging.info("successfully uploaded to image") if response.ok else response.raise_for_status()
+def search_and_create_image(image_ep, token, image_name, container_format, disk_format, image_visibility, image_file_path):
+    image_id= search_image(image_ep, token, image_name)
+    if image_id is None:
+        image_id= create_image(image_ep, token, image_name, container_format, disk_format, image_visibility)    
+    status= get_image_status(image_ep, token, image_id)
+    print(status)
+    if status== "queued":
+        print("Successfully Queued")
+        image_file= open(image_file_path, 'rb')
+        logging.info("uploading image file")
+        upload_file_to_image(image_ep, token, image_file, image_id)
+        logging.debug("image id is: {}".format(image_id))
+    return image_id
 
 def receive_all_server(nova_ep, token):
     response= send_get_request("{}/v2.1/servers/detail".format(nova_ep), token)
@@ -249,7 +312,11 @@ def get_server_detail(token, server_url):
     logging.info("Successfully Received Server Details") if response.ok else response.raise_for_status()
     data= response.json()
     return data["server"]["id"]
-
+def get_server_host(nova_ep, token, server_id):
+    response = send_get_request("{}/v2.1/servers/{}".format(nova_ep, server_id) , token)
+    logging.info("Successfully Received Server Details") if response.ok else response.raise_for_status()
+    data= response.json()
+    return data["server"]["OS-EXT-SRV-ATTR:host"]
 
 def check_server_status(nova_ep, token, server_id):
     response = send_get_request("{}/v2.1/servers/{}".format(nova_ep, server_id), token)
@@ -271,6 +338,20 @@ def get_server_floating_ip(nova_ep, token, server_id, network):
     response = send_get_request('{}/v2.1/servers/{}'.format(nova_ep, server_id), token)
     logging.info("received server network detail") if response.ok else response.raise_for_status()
     return parse_server_ip(response, network, "floating")
+
+def get_server_instance_name(nova_ep, token, server_id):
+    response = send_get_request("{}/v2.1/servers/{}".format(nova_ep, server_id) , token)
+    logging.info("Successfully Received Server Details") if response.ok else response.raise_for_status()
+    data= response.json()
+    return data["server"]["OS-EXT-SRV-ATTR:instance_name"]
+
+def search_and_create_server(nova_ep, token, server_name, image_id, key_name, flavor_id,  network_id, security_group_id):
+    server_id= search_server(nova_ep, token, server_name)
+    if server_id is None:
+        server_url= create_server(nova_ep, token, server_name, image_id, key_name, flavor_id,  network_id, security_group_id)
+        server_id= get_server_detail(token, server_url)
+    logging.debug("Server 1 id: "+server_id)    
+    return server_id
 
 def parse_port_response(data, server_fixed_ip):
     data= data.json(data)
@@ -323,5 +404,11 @@ def find_admin_project_id(keystone_ep, token):
     response= send_get_request("{}/V3/projects".format(keystone_ep))
     logging.info("successfully received project details") if response.ok else response.raise_for_status()
     return parse_json_to_search_resource(response, "projects", "name", "admin", "id")
-
+ 
+def get_baremeta_nodes_ip(nova_ep, undercloud_token):
+    servers= receive_all_server(nova_ep, undercloud_token)
+    server_ip={}
+    for server in servers["servers"]:
+        server_ip[server["name"]]= server["addresses"]["ctlplane"][0]["addr"]
+    return server_ip
 

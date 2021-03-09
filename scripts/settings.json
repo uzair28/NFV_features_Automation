@@ -1,7 +1,4 @@
 {
-    "dashboard_ip": "http://100.82.39.60",
-    "username" : "admin",
-    "password": "59NgbrPvPEUv3Hzxdm9pQaAS3",
     "network_1_name": "net_1",
     "subnet_1_name": "subnet_1",
     "subnet_cidr": "192.169.219.0/24",
@@ -9,8 +6,8 @@
     "mtu_size": "1500",
     "allowed_start": "192.168.219.10",
     "allowed_end": "192.168.219.200",
-    "image_name": "img10",
-    "image_file": "/home/stack/CentOS-7-x86_64-GenericCloud.qcow2",
+    "image_name": "my_img1",
+    "image_file": "~/CentOS-7-x86_64-GenericCloud.qcow2",
     "flavor": "sanity_flavor",
     "flavor1": "testing_flavor5",
     "security_group_name": "sec_group5",
@@ -23,10 +20,10 @@
     "vol_size1": "10",
     "vol_name2": "vdc",
     "vol_size2": "10",
-    "server_1_name": "vm1",
+    "server_1_name": "vm2",
     "server2": "vm2",
     "network_provider_type": "vlan",
-    "undercloud_keystone_ip": "http://192.168.120.10:5000/v3",
+    "undercloud_keystone_ip": "http://192.168.120.9:5000/v3",
     "undercloud_username": "admin",
-    "undercloud_password": "8JDcosXRjnrF2jjVx1aDaxk8Q"
+    "undercloud_password": "ZnXBGlPUwT833pMW3Zd0Z4d6d"
 }

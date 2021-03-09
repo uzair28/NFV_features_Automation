@@ -1,6 +1,38 @@
 import os
 import json
+import random
 
+def get_status():
+    return random.randint(0,2)
+
+def wait_for_server(servers_metadeta):
+    for i in range(10):
+        print("@@@@@@")
+        for server in servers_metadeta:
+            status= get_status() 
+            server["status"]= get_status()
+            print("server {} status is: {}".format(server.get("name"), server.get("status")))
+        if()
+        
+    
+
+
+
+print("Hello")
+servers_metadeta=[]
+for i in range(5):
+    id= "id"
+    servers_metadeta.append({"name":"server {}".format(i), "id": id, "status":None})
+
+print(servers_metadeta)  
+wait_for_server(servers_metadeta)
+
+
+
+
+
+
+'''
 def fun():
     try:
         with open("settings.json", 'r') as file:
@@ -65,3 +97,4 @@ payload= {
         }
     ]
 }
+'''

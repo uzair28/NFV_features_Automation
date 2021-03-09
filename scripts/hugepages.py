@@ -5,7 +5,7 @@ import paramiko
 def ssh_into_node(host_ip, command):
     try:
         user_name = "heat-admin"
-        logging.info("Trying to connect with a compute node")
+        logging.info("Trying to connect with node {}".format(host_ip))
         # ins_id = conn.get_server(server_name).id
         ssh_client = paramiko.SSHClient()
         ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -33,7 +33,7 @@ def get_hugepage_size(huge_page_info):
 def read_instance_xml(ssh_output):
     return huge_page_size, huge_page_consumption
 
-def hugepage_test_case_1(nova_ep, neutron_ep, glance_ep, token, settings):
+def hugepage_test_case_1(nova_ep, neutron_ep, glance_ep, token, settings, baremetal_nodes_ips):
     '''
     Testcase Step Description:
         a) Deploy Jetpack with csp profile and huge page size set to 1 GB
@@ -46,11 +46,10 @@ def hugepage_test_case_1(nova_ep, neutron_ep, glance_ep, token, settings):
         a) Deployment will be successful with no error in logs
         b) Host Aggregate page will show a custom aggregate with hugepage properties in metadata
         c) Compute nodes will show 1 GB Hugepage size (1048576 kb)
-
-    '''  
+    '''      
     #Get Huge Pages information from node
     command= "grep Huge /proc/meminfo"
-    compute_nodes_ip= ["192.168.120.171", "192.168.120.236", "192.168.120.128"]
+    compute_nodes_ip= [val for key, val in baremetal_nodes_ips.items() if "compute" in key]
     for node in compute_nodes_ip:
         ssh_output= ssh_into_node(node, command)
         huge_page_size= get_hugepage_size(ssh_output)
@@ -65,7 +64,7 @@ def hugepage_test_case_1(nova_ep, neutron_ep, glance_ep, token, settings):
         logging.info("Testcase 1 Passed")
         return True
 
-def hugepage_test_case_2(nova_ep, neutron_ep, glance_ep, token, settings):
+def hugepage_test_case_2(nova_ep, neutron_ep, glance_ep, token, settings, baremetal_nodes_ips):
     '''
     Testcase Step Description:
         a) Deploy Jetpack with csp profile and huge page size set to 2 MB
@@ -81,9 +80,9 @@ def hugepage_test_case_2(nova_ep, neutron_ep, glance_ep, token, settings):
     '''
     #Get Huge Pages information from node
     command= "grep Huge /proc/meminfo"
-    compute_nodes_ip= ["192.168.10.1", "192123", "44"]
+    compute_nodes_ip=[val for key, val in baremetal_nodes_ips.items() if "compute" in key]
     for node in compute_nodes_ip:
-        ssh_output= ssh_into_node("", command)
+        ssh_output= ssh_into_node(node, command)
         huge_page_size= get_hugepage_size(ssh_output)
         if huge_page_size != "2048":
             logging.error("Compute node {} do not have 2 MB hugepage size".format(node))

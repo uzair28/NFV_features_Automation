@@ -2,6 +2,7 @@ from openstack_functions import *
 import logging
 import paramiko
 from hugepages import *
+import os
 '''
 def ssh_into_compute_node(conn, command):
     try:
@@ -38,8 +39,36 @@ def ssh_into_compute_node(conn, command):
         print(e)
         logging.error("Unable to ssh into compute node")
         # conn.delete_server(server_name)
+
+def server_build_wait(server_ids):
 '''
-def numa_test_case_3(nova_ep, neutron_ep, glance_ep, image_ep, token, settings):
+def parse_vcpus(output): 
+    output= output.split('>')
+    return output[1][0]
+
+def ssh_into_node(host_ip, command):
+    try:
+        user_name = "heat-admin"
+        logging.info("Trying to connect with node {}".format(host_ip))
+        # ins_id = conn.get_server(server_name).id
+        ssh_client = paramiko.SSHClient()
+        ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh_session = ssh_client.connect(host_ip, username="heat-admin", key_filename="/home/osp_admin/.ssh/id_rsa")  # noqa
+        logging.info("SSH Session is established")
+        logging.info("Running command in a compute node")
+        stdin, stdout, stderr = ssh_client.exec_command(command)
+        logging.info("command {} successfully executed on compute node {}".format(command, host_ip))
+        output= stdout.read().decode('ascii')
+        return output
+    except Exception as e:
+        logging.exception(e)
+        logging.error("error ocurred when making ssh connection and running command on remote server") 
+    finally:
+        ssh_client.close()
+        logging.info("Connection from client has been closed")  
+
+
+def numa_test_case_3(nova_ep, neutron_ep, image_ep, token, settings, baremetal_node_ips,  keypair_public_key, network_id, subnet_id, security_group_id, image_id):
     '''
     Test Case Step Description:
         a) Create a Numa flavor
@@ -56,58 +85,42 @@ def numa_test_case_3(nova_ep, neutron_ep, glance_ep, image_ep, token, settings):
     '''
     logging.info("Test Case 3 running")
     # Search and Create Flavor
-    flavor_id= search_flavor(nova_ep, token, settings["flavor1"])    
-    if flavor_id is None:
-        flavor_id= create_flavor(nova_ep, token, settings["flavor1"], 4096, 4, 40)  
-        put_extra_specs_in_flavor(nova_ep, token, flavor_id, True)
-    logging.debug("flavor id is: {}".format(flavor_id))
+    flavor_id= search_and_create_flavor(nova_ep, token, settings["flavor1"], 4096, 4, 40)
+    put_extra_specs_in_flavor(nova_ep, token, flavor_id, True)
 
-    #Search and create keypair
-    keypair_public_key= search_keypair(nova_ep, token, settings["key_name"])
-    if keypair_public_key is None:
-        keypair_public_key= create_keypair(nova_ep, token, settings["key_name"])
-
-    #Search and create network
-    network_id= search_network(neutron_ep, token, settings["network_1_name"])    
-    if network_id is None:
-        network_id =create_network(neutron_ep, token, settings["network_1_name"], settings["mtu_size"], settings["network_provider_type"], False)  
-    logging.debug("network id is: {}".format(network_id))
-
-    #Search and create subnet
-    subnet_id= search_subnet(neutron_ep, token, settings["subnet_1_name"])    
-    if subnet_id is None:
-        subnet_id =create_subnet(neutron_ep, token, settings["subnet_1_name"], network_id, settings["subnet_cidr"]) 
-    logging.debug("subnet id is: {}".format(subnet_id)) 
-
-    #Search and create security group
-    security_group_id= search_security_group(neutron_ep, token, settings["security_group_name"]) 
-    if security_group_id is None:
-        security_group_id= create_security_group(neutron_ep, token, settings["security_group_name"])
-    logging.debug("security group id is: {}".format(subnet_id)) 
-
-    #search and create image
-    image_id= search_image(image_ep, token, settings["image_name"])
-    if image_id is None:
-        image_id= create_image(image_ep, token, settings["image_name"], "bare", "qcow2", "public")
-        image_file= open(settings["image_file"], 'rb')
-        logging.info("Uploading image file")
-        upload_file_to_image(image_ep, token, image_file, image_id)
-        logging.debug("image id is: {}".format(image_id))
-    #try:
-    #   image_file= open(settings["image_file"], "r")
-    #except Exception as e:
-    #        logging.exception("Failed to load image file")
-    
     #search and create server
-    server_1_id= search_server(nova_ep, token, settings["server_1_name"])
-    if server_1_id is None:
-        server_1_url= create_server(nova_ep, token, settings["server_1_name"], image_id,settings["key_name"], flavor_id,  network_id, security_group_id)
-        server_1_id= get_server_detail(token, server_1_url)
-    logging.debug("Server 1 id: "+server_1_id)    
-    
-    
-    result= hugepage_test_case_1("nova_ep", "neutron_ep", "glance_ep", "token", "settings")
-    print(result)
+    server_id= search_and_create_server(nova_ep, token, settings["server_1_name"], image_id,settings["key_name"], flavor_id,  network_id, security_group_id)
+
+    #Get Server Host
+    host= get_server_host(nova_ep, token, server_id)
+    instance_name= get_server_instance_name(nova_ep, token, server_id)
+    host= host.split('.')
+    command= "sudo cat /etc/libvirt/qemu/{}.xml | grep vcpus".format(instance_name)
+    output= ssh_into_node(baremetal_node_ips.get(host[0]), command)
+    vcpus= parse_vcpus(output)
+    if vcpus== "4":
+        logging.info("Test Case Passed")
+        return True
+    else: 
+        logging.error("Test Case Failed")
+        return False
+
+
+
+
+
+
+
+
+
+
+   # result= hugepage_test_case_1("nova_ep", "neutron_ep", "glance_ep", "token", "settings", baremetal_node_ips)
+   # print(result)
+    #result= hugepage_test_case_2("nova_ep", "neutron_ep", "glance_ep", "token", "settings", baremetal_node_ips)
+   # print(result)
+
+
+
 
 
 
