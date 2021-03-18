@@ -12,17 +12,27 @@ def send_get_request(api_url, token, header="application/json"):
 
 def send_put_request(api_url, token, payload, header='application/json'):
     try:
-       return requests.put(api_url, headers= {'content-type':header, 'X-Auth-Token': token}, data= payload)
+       return requests.put(api_url, headers= {'content-type':header, 'X-Auth-Token': token}, data=json.dumps(payload))
     except Exception as e:
         logging.error( "request processing failure ", stack_info=True)
         print(e)
 
 def send_post_request(api_url, token, payload, header='application/json'):
     try:
-        return requests.post(api_url, headers= {'content-type':header, 'X-Auth-Token': token}, data=json.dumps(payload))
+        #'OpenStack-API-Version': 'compute 2.74',
+        return requests.post(api_url, headers= {'content-type':header, 'OpenStack-API-Version': 'compute 2.74', 'X-Auth-Token': token}, data=json.dumps(payload))
     except Exception as e:
        logging.error( "request processing failure ", stack_info=True)
        print(e)
+def send_delete_request(api_url, token, header='application/json' ):
+    try:
+        return requests.delete(api_url, headers= {'content-type':header, 'X-Auth-Token': token})
+    except Exception as e:
+       logging.error( "request processing failure ", stack_info=True)
+       print(e)
+def delete_resource(api_url, token):
+    send_delete_request(api_url, token)
+
 
 def parse_json_to_search_resource(data, resource_name, resource_key, resource_value, return_key):
     data= data.json()
@@ -50,6 +60,9 @@ def search_network(neutron_ep, token, network_name):
     logging.info("successfully received networks list") if response.ok else response.raise_for_status()
     return parse_json_to_search_resource(response, "networks", "name", network_name, "id")
     
+'''
+Networks
+'''
 def create_network(neutron_ep, token, network_name, mtu_size, network_provider_type, is_external):
     #create network
     payload= {
@@ -58,9 +71,11 @@ def create_network(neutron_ep, token, network_name, mtu_size, network_provider_t
             "admin_state_up": True,
             "mtu": mtu_size,
             "provider:network_type": network_provider_type,
-            "router:external": is_external
+            "router:external": is_external,
+            "provider:physical_network": "physint"
             }
         }
+
     response= send_post_request('{}/v2.0/networks'.format(neutron_ep), token, payload)
     logging.info("successfully created network {}".format(network_name)) if response.ok else response.raise_for_status()
     data=response.json()
@@ -71,8 +86,23 @@ def search_and_create_network(neutron_ep, token, network_name, mtu_size, network
         network_id =create_network(neutron_ep, token, network_name, mtu_size, network_provider_type, False)  
     logging.debug("network id is: {}".format(network_id))
     return network_id
+def create_port(neutron_ep, token, network_id, subnet_id, name ):
+    payload= {"port": {
+        "binding:vnic_type": "direct", 
+        "network_id": network_id, 
+	    "admin_state_up": 'true', 
+        "fixed_ips": [{"subnet_id": subnet_id}], "name": name}}
+    print(network_id)
+    print(subnet_id)
+    response= send_post_request('{}/v2.0/ports'.format(neutron_ep), token, payload)
+    print(response.text)
+    logging.info("successfully created port") if response.ok else response.raise_for_status()
+    data=response.json()
+    return data["port"]["id"], data["port"]["fixed_ips"][0]["ip_address"]
 
-
+'''
+Subnets
+'''
 def search_subnet(neutron_ep, token, subnet_name):
     #get list of subnets
     response= send_get_request("{}/v2.0/subnets".format(neutron_ep), token)
@@ -104,6 +134,9 @@ def search_and_create_subnet(neutron_ep, token, subnet_name, network_id, subnet_
     logging.debug("subnet id is: {}".format(subnet_id)) 
     return subnet_id
 
+'''
+Flavor
+'''
 
 def search_flavor(nova_ep, token, flavor_name):
     # get list of flavors
@@ -133,14 +166,11 @@ def search_and_create_flavor(nova_ep, token, flavor_name, ram, vcpu, disks):
         flavor_id= create_flavor(nova_ep, token, flavor_name, ram, vcpu, disks)   
     logging.debug("flavor id is: {}".format(flavor_id))
     return flavor_id
-
-
 def put_extra_specs_in_flavor(nova_ep, token, flavor_id,is_numa, mem_page_size=None):
     #add extra specs to flavors
     if is_numa== True:
         payload= {
             "extra_specs": {
-            #    "aggregate_instance_extra_specs:pinned": "True", 
                 "hw:cpu_policy": "dedicated", 
                 "hw:cpu_thread_policy": "require",
                 "hw:numa_nodes": "1", 
@@ -149,35 +179,75 @@ def put_extra_specs_in_flavor(nova_ep, token, flavor_id,is_numa, mem_page_size=N
         }
     else: 
         payload={
-            "flavor": {
                 "extra_specs": {
-                    "hw:numa_nodes": "1",
                     "hw:cpu_policy": "dedicated",
-                    "hw:cpu_thread_policy": "require",
                     "hw:mem_page_size": mem_page_size,
-                    "quota:cpu_quota": "10000",
-                    "quota:cpu_period": "20000",
-                    "hw:cpu_policy": "dedicated",
-                    "hw:cpu_thread_policy": "require",
+                    "hw:cpu_thread_policy": "prefer",
                     "hw:numa_nodes": "1",
-                    "aggregate_instance_extra_specs:hugepages": "True"
-                }   
-            }
+                    #"hw:emulator_threads_policy": "isolate"
+                }  
+
         }
     response= send_post_request("{}/v2.1/flavors/{}/os-extra_specs".format(nova_ep, flavor_id), token, payload)
     logging.info("successfully added extra specs to  flavor {}".format(flavor_id)) if response.ok else response.raise_for_status()
+def put_ovs_dpdk_specs_in_flavor(nova_ep, token, flavor_id):
+    payload={
+                "extra_specs": {
+                    "hw:cpu_policy": "dedicated",
+                    "hw:mem_page_size": "large",
+                    "hw:cpu_thread_policy": "require",
+                    "hw:numa_nodes": "1", 
+                    "hw:numa_mempolicy":"preferred"
+                }
+        }  
+ 
 
-def create_router(neutron_ep, token, router_name):
+    response= send_post_request("{}/v2.1/flavors/{}/os-extra_specs".format(nova_ep, flavor_id), token, payload)
+    logging.info("successfully added extra specs to  flavor {}".format(flavor_id)) if response.ok else response.raise_for_status()
+'''
+Router
+'''
+def search_router(neutron_ep, token, router_name):
+    response= send_get_request("{}/v2.0/routers".format(neutron_ep), token)
+    logging.info("successfully received router list") if response.ok else response.raise_for_status()
+
+    return parse_json_to_search_resource(response, "routers", "name", router_name, "id")
+
+def create_router(neutron_ep, token, router_name, network_id, subnet_id):
     payload={"router":
         {"name": router_name,
         "admin_state_up":" true",
+        "external_gateway_info": {
+            "network_id": network_id,
+            "enable_snat": "true",
+            "external_fixed_ips": [
+                {
+                    "subnet_id": subnet_id
+                }
+            ]
         }
+        }
+
     }
-    response= requests.post('{}/v2.0/routers'.format(neutron_ep), token, payload)
+    response= send_post_request('{}/v2.0/routers'.format(neutron_ep), token, payload)
     logging.info("successfully created router {}".format(router_name)) if response.ok else response.raise_for_status()  
     data= response.json()
     return data['router']['id']
+def set_router_gateway(neutron_ep, token, router_id, network_id):
+    print(router_id)
+    payload={"router": {"external_gateway_info": {"network_id": network_id}}}
+    response= send_post_request("{}/v2.0/routers/{}".format(neutron_ep,router_id), token, payload)
+    print(response.text)
+    logging.info("successfully set gateway to router {}".format(router_id)) if response.ok else response.raise_for_status()  
+def add_interface_to_router(neutron_ep, token, router_id, subnet_id):
+    payload={
+    "subnet_id": subnet_id
+    }
     
+    response= send_put_request('{}/v2.0/routers/{}/add_router_interface'.format(neutron_ep,router_id), token, payload)
+    print(response.text)
+    logging.info("successfully added interface to router {}".format(router_id)) if response.ok else response.raise_for_status()  
+  
 def search_security_group(neutron_ep, token, security_group_name):
     response= send_get_request("{}/v2.0/security-groups".format(neutron_ep), token)
     logging.info("successfully received security group list") if response.ok else response.raise_for_status()
@@ -201,20 +271,36 @@ def search_and_create_security_group(neutron_ep, token, security_group_name):
     logging.debug("security group id is: {}".format(security_group_id)) 
     return security_group_id
 
-def add_rule_to_security_group(neutron_ep, token, security_group_id, direction, ip_version, protocol, min_port, max_port):
+def add_icmp_rule_to_security_group(neutron_ep, token, security_group_id):
     payload= {"security_group_rule":{
-            "direction": direction,
-            "ethertype":ip_version,
+            "direction": "ingress",
+            "ethertype":"IPv4",
+            "direction": "ingress",
             "remote_ip_prefix": "0.0.0.0/0",
-            "protocol": protocol,
-            "security_group_id": security_group_id,
-            "port_range_min": min_port,
-            "port_range_max": max_port
+            "protocol": "icmp",
+            "security_group_id": security_group_id
         }
     }
     response= send_post_request('{}/v2.0/security-group-rules'.format(neutron_ep), token, payload)
-    logging.info("Successfully added {} rule to Security Group ".format(protocol)) if response.ok else response.raise_for_status()
+    logging.info("Successfully added ICMP rule to Security Group") if response.ok else response.raise_for_status()
+def add_ssh_rule_to_security_group(neutron_ep, token, security_group_id):
+    payload= {"security_group_rule": {
+        "direction": "ingress",
+        "ethertype":"IPv4",
+        "direction": "ingress",
+         "remote_ip_prefix": "0.0.0.0/0",
+        "protocol": "tcp",
+        "port_range_min": "22",
+        "port_range_max": "22",
+        "security_group_id": security_group_id
+        }
+        }
+    response= send_post_request('{}/v2.0/security-group-rules'.format(neutron_ep), token, payload)
+    logging.info("Successfully added SSH rule to Security Group") if response.ok else response.raise_for_status()
 
+'''
+Keypair
+'''
 def search_keypair(nova_ep, token, keypair_name):
     response= send_get_request("{}/v2.1/os-keypairs".format(nova_ep), token)
     logging.info("successfully received keypair list") if response.ok else response.raise_for_status()
@@ -246,6 +332,9 @@ def search_and_create_kaypair(nova_ep, token, key_name):
     logging.debug("Keypair public key is: {}".format(keypair_public_key))
     return keypair_public_key
 
+'''
+Image
+'''
 def search_image(nova_ep, token, image_name):
     response= send_get_request("{}/v2.1/images".format(nova_ep), token)
     logging.info("successfully received images list") if response.ok else response.raise_for_status()
@@ -271,7 +360,13 @@ def get_image_status(nova_ep, token, image_id):
 
 def upload_file_to_image(image_ep, token, image_file, image_id):
     #image_file= open("cirros-0.5.1-x86_64-disk.img", "r")
-    response = send_put_request("{}/v2.1/images/{}/file".format(image_ep, image_id), token, image_file, "application/octet-stream")
+    #response = send_put_request("{}/v2.1/images/{}/file".format(image_ep, image_id), token, image_file, "application/octet-stream")
+    try:
+        response= requests.put("{}/v2.1/images/{}/file".format(image_ep, image_id), headers= {'content-type':"application/octet-stream", 'X-Auth-Token': token}, data=image_file)
+        print(response.text)
+    except Exception as e:
+        logging.error( "request processing failure ", stack_info=True)
+        print(e)
     logging.info("successfully uploaded to image") if response.ok else response.raise_for_status()
 def search_and_create_image(image_ep, token, image_name, container_format, disk_format, image_visibility, image_file_path):
     image_id= search_image(image_ep, token, image_name)
@@ -287,6 +382,10 @@ def search_and_create_image(image_ep, token, image_name, container_format, disk_
         logging.debug("image id is: {}".format(image_id))
     return image_id
 
+
+'''
+Servers
+'''
 def receive_all_server(nova_ep, token):
     response= send_get_request("{}/v2.1/servers/detail".format(nova_ep), token)
     logging.info("successfully received server list") if response.ok else response.raise_for_status()
@@ -297,16 +396,37 @@ def search_server(nova_ep, token, server_name):
     logging.info("successfully received server list") if response.ok else response.raise_for_status()
     return parse_json_to_search_resource(response, "servers", "name", server_name, "id")
 
-def create_server(nova_ep, token, server_name, image_id, keypair_name, flavor_id,  network_id, security_group_id):
+def create_server(nova_ep, token, server_name, image_id, keypair_name, flavor_id,  network_id, security_group_id, host=None):
     payload= {"server": {"name": server_name, "imageRef": image_id,
         "key_name": keypair_name, "flavorRef": flavor_id, 
         "max_count": 1, "min_count": 1, "networks": [{"uuid": network_id}], 
         "security_groups": [{"name": security_group_id}]}}   
+    payload_manual_host={
+        "host": host
+        }
+    if host is not None:
+        payload= {"server":{**payload["server"], **payload_manual_host}}
     response = send_post_request('{}/v2.1/servers'.format(nova_ep), token, payload)
+    print(response.text)
     logging.info("successfully created server {}".format(server_name)) if response.ok else  response.raise_for_status()
     data= response.json()
     return data["server"]["links"][0]["href"]  
-
+def create_sriov_server(nova_ep, token, server_name, image_id, keypair_name, flavor_id,  port_id, availability_zone ,security_group_id, host=None):
+    print("Securit Group Id is: "+security_group_id)
+    payload= {"server": {"name": server_name, "imageRef": image_id,
+        "key_name": keypair_name, "flavorRef": flavor_id, "security_groups": [{"name": security_group_id}],
+        "max_count": 1, "min_count": 1, "networks": [{"port": port_id}], 
+         "availability_zone": availability_zone}}   
+    payload_manual_host={
+        "host": host
+        }
+    if host is not None:
+        payload= {"server":{**payload["server"], **payload_manual_host}}
+    response = send_post_request('{}/v2.1/servers'.format(nova_ep), token, payload)
+    print(response.text)
+    logging.info("successfully created sriov server {}".format(server_name)) if response.ok else  response.raise_for_status()
+    data= response.json()
+    return data["server"]["links"][0]["href"]  
 def get_server_detail(token, server_url):
     response = send_get_request(server_url, token)
     logging.info("Successfully Received Server Details") if response.ok else response.raise_for_status()
@@ -324,13 +444,16 @@ def check_server_status(nova_ep, token, server_id):
     return data["server"]["OS-EXT-STS:vm_state"] if response.ok else response.raise_for_status()
 
 def parse_server_ip(data, network, network_type):
+    data=data.json()
     for networks in data["server"]["addresses"][str(network)]:
-            if networks["OS-EXT-IPS:type"] == network_type:
-                logging.info("received {} ip address of server".format())
-                return networks["addr"]
+        if networks["OS-EXT-IPS:type"] == network_type:
+            #logging.info("received {} ip address of server".format())
+            return networks["addr"]
 
 def get_server_ip(nova_ep, token, server_id, network):
+    
     response = send_get_request('{}/v2.1/servers/{}'.format(nova_ep, server_id), token)
+    print(response.text)
     logging.info("received server network detail") if response.ok else response.raise_for_status()
     return parse_server_ip(response, network, "fixed")
 
@@ -344,17 +467,52 @@ def get_server_instance_name(nova_ep, token, server_id):
     logging.info("Successfully Received Server Details") if response.ok else response.raise_for_status()
     data= response.json()
     return data["server"]["OS-EXT-SRV-ATTR:instance_name"]
+def perform_action_on_server(nova_ep,token, server_id, action):
+    payload={
+    action: None
+    }
+    send_post_request("{}/v2.1/servers/{}/action".format(nova_ep, server_id), token, payload)
+def resize_server(nova_ep,token, server_id, flavor_id):
+    payload= {
+    "resize" : {
+        "flavorRef" : flavor_id,
+        "OS-DCF:diskConfig": "AUTO"
+        }
+    }
+    response= send_post_request("{}/v2.1/servers/{}/action".format(nova_ep, server_id), token, payload)
+    print(response.text)
+    return response.status_code
 
-def search_and_create_server(nova_ep, token, server_name, image_id, key_name, flavor_id,  network_id, security_group_id):
+def migrate_server(nova_ep,token, server_id):
+    payload= {
+        "os-migrateLive": {
+            "host": None,
+            "block_migration": "auto",
+        }
+        }
+    response=send_post_request("{}/v2.1/servers/{}/action".format(nova_ep, server_id), token, payload)
+    return response.status_code
+
+def search_and_create_server(nova_ep, token, server_name, image_id, key_name, flavor_id,  network_id, security_group_id, host=None):
     server_id= search_server(nova_ep, token, server_name)
     if server_id is None:
-        server_url= create_server(nova_ep, token, server_name, image_id, key_name, flavor_id,  network_id, security_group_id)
+        server_url= create_server(nova_ep, token, server_name, image_id, key_name, flavor_id,  network_id, security_group_id, host)
+        server_id= get_server_detail(token, server_url)
+    logging.debug("Server 1 id: "+server_id)    
+    return server_id
+def search_and_create_sriov_server(nova_ep, token, server_name, image_id, key_name, flavor_id,  port_id, availability_zone, security_group_id, host=None):
+    server_id= search_server(nova_ep, token, server_name)
+    if server_id is None:
+        server_url= create_sriov_server(nova_ep, token, server_name, image_id, key_name, flavor_id, port_id, availability_zone, security_group_id, host)
         server_id= get_server_detail(token, server_url)
     logging.debug("Server 1 id: "+server_id)    
     return server_id
 
+'''
+Floating Ip
+'''
 def parse_port_response(data, server_fixed_ip):
-    data= data.json(data)
+    data= data.json()
     for port in data["ports"]:
         if port["fixed_ips"][0]["ip_address"] == server_fixed_ip:
             return port["id"]   
@@ -366,16 +524,18 @@ def get_ports(neutron_ep, token, network_id, server_ip):
 
 def create_floating_ip(neutron_ep, token, network_id, subnet_id, server_ip_address, server_port_id):
     payload= {"floatingip": 
-             {"floating_network_id": network_id,
+             {"floating_network_id":network_id,
+             
               "subnet_id": subnet_id,
               "fixed_ip_address": server_ip_address,
                "port_id": server_port_id
               }
              } 
-    response= send_post_request("{}/V2.0/floatingips".format(neutron_ep), token, payload)
+    response= send_post_request("{}/v2.0/floatingips".format(neutron_ep), token, payload)
+    print(response.text)
     logging.info("successfully assigned floating ip to server") if response.ok else response.raise_for_status()
     data= response.json()
-    return data["floatingip"]["floating_ip_address"]
+    return data["floatingip"]["floating_ip_address"], data["floatingip"]["id"]
 
 def attach_volume_to_server( nova_ep, token, project_id, server_id, volume_id, mount_point):
     payload= {"volumeAttachment": {"volumeId": volume_id}}
@@ -387,6 +547,9 @@ def search_volume(storage_ep, token, volume_name, project_id):
     logging.info("successfully received volume list") if response.ok else response.raise_for_status()
     return parse_json_to_search_resource(response, "volumes", "name", "id")
 
+'''
+Volume
+'''
 def create_volume(storage_ep, token, project_id, volume_name, volume_size):
     payload= {
 
@@ -411,4 +574,9 @@ def get_baremeta_nodes_ip(nova_ep, undercloud_token):
     for server in servers["servers"]:
         server_ip[server["name"]]= server["addresses"]["ctlplane"][0]["addr"]
     return server_ip
-
+def get_compute_host_list(nova_ep, token):
+    print("DDDDDD")
+    response= send_get_request("{}/V3/os-host".format(nova_ep), token)
+    logging.info("successfully received host list") if response.ok else response.raise_for_status()
+    response= response.json()
+    print(json.dumps(response, indent=1))
