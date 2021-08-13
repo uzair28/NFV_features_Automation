@@ -5,7 +5,7 @@ import os
 from test_cases import *
 import time
 
- 
+''' 
 def ssh_conne(server1, server2, settings):
     try:
         command= "ping  -c 3 {}".format(server2)
@@ -27,7 +27,7 @@ def ssh_conne(server1, server2, settings):
     finally:
         client.close()
         logging.info("Connection from client has been closed")  
-
+'''
 def parse_hugepage_size(huge_page_info, parameter):
     huge_page_info= huge_page_info.split('\n')
     for property in huge_page_info:
@@ -68,13 +68,13 @@ def sriov_test_case_3(baremetal_nodes_ips):
         for interface in interfaces:
             output=output+ "interface {}\n".format(str(interface))
             for node in compute_nodes_ip:
-                command= "ip link show "+interface
+                command= "ip link show "+interface + " | grep vf"
                 vflags= ssh_into_node(node, command)
-                #vflags=""
+                vflags= vflags[0]
                 output= output+"Compute Node: {} ".format(node)
                 total_flags= vflags.count("vf")
                 output= output+ " interface {} total vflags are {} \n".format(interface,total_flags)
-                output= output+ vflags
+                output= output+ str(vflags)
                 if(str(total_flags) != vfg):
                     error= 1
         if(error==1):
@@ -93,7 +93,7 @@ def sriov_test_case_3(baremetal_nodes_ips):
 def sriov_test_case_7_8(nova_ep, neutron_ep, image_ep, token, settings, baremetal_node_ips,  keypair_public_key, network_id, subnet_id, security_group_id, image_id, flavor_id):  
     logging.info("SRIOV Test Case 7 and 8 running")
     isPassed7=isPassed8= False
-    message7=message8=port_id=port_ip=status=floating_ip_id=server_id=""    
+    message7=message8=port_id=port_ip=status=floating_ip_id=server_id=status=""    
     try:
         # Search and Create Flavor
         port_id, port_ip= create_port(neutron_ep, token, network_id, subnet_id, "test_case_port_1" )
@@ -130,7 +130,8 @@ def sriov_test_case_7_8(nova_ep, neutron_ep, image_ep, token, settings, baremeta
             logging.info("Floatinf Ip is: {}".format(flaoting_ip))
             wait_instance_boot(flaoting_ip)
             wait_instance_ssh(flaoting_ip, settings)
-            result, error= ssh_conne(flaoting_ip, "8.8.8.8", settings)
+            
+            result, error= instance_ssh(flaoting_ip, settings, "ping -c 3 8.8.8.8")
             if error=="":
                 isPassed8=True
                 logging.info("Testcase 8 passed")
@@ -144,7 +145,7 @@ def sriov_test_case_7_8(nova_ep, neutron_ep, image_ep, token, settings, baremeta
                 delete_resource("{}/v2.1/servers/{}".format(nova_ep,server_id), token)
             if(port_id != ""):
                 delete_resource("{}/v2.0/ports/{}".format(neutron_ep,port_id), token)
-            if(server_floating_ip_id !=""):
+            if(floating_ip_id !=""):
                 logging.info("releasing floating ip")
                 delete_resource("{}/v2.0/floatingips/{}".format(neutron_ep, floating_ip_id), token)
         except Exception as e:
@@ -156,7 +157,7 @@ def sriov_test_case_7_8(nova_ep, neutron_ep, image_ep, token, settings, baremeta
                 delete_resource("{}/v2.1/servers/{}".format(nova_ep,server_id), token)
             if(port_id != ""):
                 delete_resource("{}/v2.0/ports/{}".format(neutron_ep,port_id), token)
-            if(server_floating_ip_id !=""):
+            if(floating_ip_id !=""):
                 logging.info("releasing floating ip")
                 delete_resource("{}/v2.0/floatingips/{}".format(neutron_ep, floating_ip_id), token)
 
@@ -196,10 +197,11 @@ def sriov_test_case_10(nova_ep, neutron_ep, image_ep, token, settings, baremetal
             logging.debug("Server 1 ip: {}".format(flaoting_1_ip))
             logging.debug("Server 2 ip: {}".format(flaoting_2_ip))
             logging.info("ssh into server1")
-            result1, error1= ssh_conne(flaoting_1_ip, flaoting_2_ip, settings)
+            command= "ping -c 3 {}".format(flaoting_2_ip)
+            result1, error1= instance_ssh(flaoting_1_ip, settings, command)
             logging.info("ssh into server2")
-           
-            result2, error2= ssh_conne(flaoting_2_ip, flaoting_1_ip, settings)
+            command= "ping -c 3 {}".format(flaoting_1_ip)
+            result2, error2= instance_ssh(flaoting_2_ip, settings, command)
             if error1=="" and error2== "":
                 isPassed=True
                 logging.info("SRIOV Testcase 10 passed")
@@ -285,9 +287,12 @@ def sriov_test_case_11(nova_ep, neutron_ep, image_ep, token, settings, baremetal
             logging.debug("Server 1 ip: {}".format(flaoting_1_ip))
             logging.debug("Server 2 ip: {}".format(flaoting_2_ip))
             logging.info("ssh into server1")
-            result1, error1= ssh_conne(flaoting_1_ip, flaoting_2_ip, settings)
+            command= "ping -c 3 {}".format(flaoting_2_ip)
+            result1, error1= instance_ssh(flaoting_1_ip, settings, command)
+
             logging.info("ssh into server2")            
-            result2, error2= ssh_conne(flaoting_2_ip, flaoting_1_ip, settings)
+            command= "ping -c 3 {}".format(flaoting_1_ip)
+            result2, error2= instance_ssh(flaoting_2_ip, settings, command)
             if error1=="" and error2== "":
                 isPassed=True
                 logging.info("Testcase 11 passed")
@@ -370,10 +375,12 @@ def sriov_test_case_12(nova_ep, neutron_ep, image_ep, token, settings, baremetal
             logging.info("Server 1 ip: {}".format(flaoting_1_ip))
             logging.info("Server 2 ip: {}".format(flaoting_2_ip))
             logging.info("ssh into server1")
-            result1, error1= ssh_conne(flaoting_1_ip, flaoting_2_ip, settings)
+            command= "ping -c 3 {}".format(flaoting_1_ip)
+            result1, error1= instance_ssh(flaoting_2_ip, settings, command)
             logging.info("result 1 is: ".format(result1))
-            logging.info("ssh into server2")  
-            result2, error2= ssh_conne(flaoting_2_ip, flaoting_1_ip, settings)
+            logging.info("ssh into server2") 
+            command= "ping -c 3 {}".format(flaoting_2_ip)
+            result2, error2= instance_ssh(flaoting_1_ip, settings, command) 
             print("result 1 is: ".format(result2))
             if error1=="" and error2== "":
                 isPassed=True
@@ -423,6 +430,8 @@ def sriov_test_case_13_14(nova_ep, neutron_ep, image_ep, token, settings, bareme
     logging.info("SRIOV Test Case 13, 14 running")
     isPassed13=isPassed14= False
     message13=message14=""
+    port_1_id=port_2_id=floating_ip_id=server_1_id=server_2_id=floating_1_ip_id=floating_2_ip_id="" 
+
     try:
         compute0 =  [key for key, val in baremetal_node_ips.items() if "compute-0" in key]
         compute0= compute0[0]
@@ -454,15 +463,12 @@ def sriov_test_case_13_14(nova_ep, neutron_ep, image_ep, token, settings, bareme
             wait_instance_ssh(flaoting_2_ip, settings)
             print("Server 1 ip: {}".format(flaoting_1_ip))
             print("Server 2 ip: {}".format(flaoting_2_ip))
-            logging.info("ssh into server1")
-            result1, error1= ssh_conne(flaoting_1_ip, flaoting_2_ip, settings)
-            print("result 1 is: ".format(result1))
-            logging.info("ssh into server2")
-           
-            result2, error2= ssh_conne(flaoting_2_ip, flaoting_1_ip, settings)
-            print("result 1 is: ".format(result2))
-            print("Error 1 is: ".format(error1))
-            print("Error 2 is: ".format(error2))
+            command= "ping -c 3 {}".format(flaoting_1_ip)
+            result1, error1= instance_ssh(flaoting_2_ip, settings, command)
+            logging.info("result 1 is: ".format(result1))
+            logging.info("ssh into server2") 
+            command= "ping -c 3 {}".format(flaoting_2_ip)
+            result2, error2= instance_ssh(flaoting_1_ip, settings, command) 
 
             if error1 =="" and error2 == "":
                 isPassed13=True     
@@ -559,11 +565,14 @@ def sriov_test_case_15(nova_ep, neutron_ep, image_ep, token, settings, baremetal
             wait_instance_boot(flaoting_2_ip)
             wait_instance_ssh(flaoting_1_ip, settings)
             wait_instance_ssh(flaoting_2_ip, settings)
+            
             logging.info("ssh into server1")
-            result1, error1= ssh_conne(flaoting_1_ip, flaoting_2_ip, settings)
-            logging.info("ssh into server2")
-           
-            result2, error2= ssh_conne(flaoting_2_ip, flaoting_1_ip, settings)
+            command= "ping -c 3 {}".format(flaoting_1_ip)
+            result1, error1= instance_ssh(flaoting_2_ip, settings, command)
+            logging.info("result 1 is: ".format(result1))
+            logging.info("ssh into server2") 
+            command= "ping -c 3 {}".format(flaoting_2_ip)
+            result2, error2= instance_ssh(flaoting_1_ip, settings, command) 
             if error1=="" and error2== "":
                 isPassed=True
                 logging.info("Testcase 15 passed")
@@ -638,9 +647,12 @@ def sriov_test_case_16(nova_ep, neutron_ep, image_ep, token, settings, baremetal
             wait_instance_ssh(flaoting_1_ip, settings)
             wait_instance_ssh(flaoting_2_ip, settings)
             logging.info("ssh into server1")
-            result1, error1= ssh_conne(flaoting_1_ip, flaoting_2_ip, settings)
+            command= "ping -c 3 {}".format(flaoting_1_ip)
+            result1, error1= instance_ssh(flaoting_2_ip, settings, command)
+            logging.info("result 1 is: ".format(result1))
             logging.info("ssh into server2") 
-            result2, error2= ssh_conne(flaoting_2_ip, flaoting_1_ip, settings)
+            command= "ping -c 3 {}".format(flaoting_2_ip)
+            result2, error2= instance_ssh(flaoting_1_ip, settings, command) 
             print("result 1 is: ".format(result2))
             if error1=="" and error2== "":
                 isPassed=True
@@ -649,7 +661,6 @@ def sriov_test_case_16(nova_ep, neutron_ep, image_ep, token, settings, baremetal
             else: 
                 logging.error("Test Case 16 failed")
                 message="Both instances successfully pinged eachother on different compute node and different  network   \n result of instance {} ({}) ping to instance {} ({}) is \n {} \n result of instance {} ping to instance {} is \n {} \n ".format(flaoting_1_ip, port_1_ip, flaoting_2_ip, server_2_ip,  result1, flaoting_2_ip, flaoting_1_ip, result2)
-                logging.info("deleting flavor")
         if(server_1_id != ""):
             logging.info("deleting all servers")
             delete_resource("{}/v2.1/servers/{}".format(nova_ep,server_1_id), token)
@@ -718,10 +729,12 @@ def sriov_test_case_17(nova_ep, neutron_ep, image_ep, token, settings, baremetal
             wait_instance_ssh(flaoting_1_ip, settings)
             wait_instance_ssh(flaoting_2_ip, settings)
             logging.info("ssh into server1")
-            result1, error1= ssh_conne(flaoting_1_ip, flaoting_2_ip, settings)
-            logging.info("ssh into server2")
-           
-            result2, error2= ssh_conne(flaoting_2_ip, flaoting_1_ip, settings)
+            command= "ping -c 3 {}".format(flaoting_1_ip)
+            result1, error1= instance_ssh(flaoting_2_ip, settings, command)
+            logging.info("result 1 is: ".format(result1))
+            logging.info("ssh into server2") 
+            command= "ping -c 3 {}".format(flaoting_2_ip)
+            result2, error2= instance_ssh(flaoting_1_ip, settings, command) 
             if error1=="" and error2== "":
                 isPassed=True
                 logging.info("Testcase 17 passed")
@@ -803,10 +816,12 @@ def sriov_test_case_18(nova_ep, neutron_ep, image_ep, token, settings, baremetal
             wait_instance_ssh(flaoting_1_ip, settings)
             wait_instance_ssh(flaoting_2_ip, settings)
             logging.info("ssh into server1")
-            result1, error1= ssh_conne(flaoting_1_ip, flaoting_2_ip, settings)
-            logging.info("ssh into server2")
-           
-            result2, error2= ssh_conne(flaoting_2_ip, flaoting_1_ip, settings)
+            command= "ping -c 3 {}".format(flaoting_1_ip)
+            result1, error1= instance_ssh(flaoting_2_ip, settings, command)
+            logging.info("result 1 is: ".format(result1))
+            logging.info("ssh into server2") 
+            command= "ping -c 3 {}".format(flaoting_2_ip)
+            result2, error2= instance_ssh(flaoting_1_ip, settings, command) 
             if error1=="" and error2== "":
                 isPassed=True
                 logging.info("Testcase 18 passed")
@@ -858,7 +873,7 @@ def sriov_test_case_19(nova_ep, neutron_ep, image_ep, token, settings, baremetal
     logging.info("SRIOV Test Case 19 running")
     isPassed= False
     message=""
-    server1_id=server_floating_ip_id=""
+    server_1_id=server_floating_ip_id=port_1_id=""
     
     try:
         compute1 =  [key for key, val in baremetal_node_ips.items() if "compute-1" in key]
@@ -906,18 +921,21 @@ def sriov_test_case_19(nova_ep, neutron_ep, image_ep, token, settings, baremetal
                     logging.error("SRIOV test Case 19 failed, ping failed after live migration,  status code is {}, old host name is {}, new host name is : {} \n ping status is: \n {}".format(response, compute1, new_host, stdout))
                     message= "SRIOV test Case 19 failed, ping failed after live migration,  status code is {}, old host name is {}, new host name is : {} \n ping status is: \n {}".format(response, compute1, new_host, stdout)
             else:
-                logging.error("live migration of instance failed, status code is {},  old host name is {}, new host name is : {} ".format(response, compute1, new_host, ))
-                message="live migration of instance failed, status code is {},  old host name is {}, new host name is : {} ".format(response, compute1, new_host, )
+                logging.error("SRIOV test Case 20 failed, live migration of instance failed, status code is {},  old host name is {}, new host name is : {} ".format(response, compute1, new_host, ))
+                message="SRIOV test Case 20 failed, live migration of instance failed, status code is {},  old host name is {}, new host name is : {} ".format(response, compute1, new_host, )
         
+        if(server_1_id != ""):
+            logging.info("deleting all servers")
+            delete_resource("{}/v2.1/servers/{}".format(nova_ep,server_1_id), token)
+        if(server_floating_ip_id ==""):
+            logging.info("releasing floating ip")
+            delete_resource("{}/v2.0/floatingips/{}".format(neutron_ep, server_floating_ip_id), token)
+        if(port_1_id != ""):
+            delete_resource("{}/v2.0/ports/{}".format(neutron_ep,port_1_id), token)
 
-        logging.info("deleting all servers")
-        delete_resource("{}/v2.1/servers/{}".format(nova_ep,server_1_id), token)
-        time.sleep(10)
-        logging.info("releasing floating ip")
-        delete_resource("{}/v2.0/floatingips/{}".format(neutron_ep, server_floating_ip_id), token)
     except Exception as e:
-        logging.exception("DVR test Case 31 failed/ error occured")
-        message="DVR testcase 31 failed/ error occured {}".format(e)
+        logging.exception("SRIOV test Case 19 failed/ error occured")
+        message="SRIOV testcase 19 failed/ error occured {}".format(e)
         logging.exception(e)
         logging.error(e)
 
@@ -927,14 +945,17 @@ def sriov_test_case_19(nova_ep, neutron_ep, image_ep, token, settings, baremetal
         if(server_floating_ip_id ==""):
             logging.info("releasing floating ip")
             delete_resource("{}/v2.0/floatingips/{}".format(neutron_ep, server_floating_ip_id), token)
-    logging.info("DVR Test Case 31 finished")
+        if(port_1_id != ""):
+            delete_resource("{}/v2.0/ports/{}".format(neutron_ep,port_1_id), token)
+
+    logging.info("SRIOV Test Case 19 finished")
     return isPassed, message
 
 def sriov_test_case_20(nova_ep, neutron_ep, image_ep, token, settings, baremetal_node_ips,  keypair_public_key, network_id, subnet_id, security_group_id, image_id, flavor_id):  
-    logging.info("HCI Test Case 32 running")
+    logging.info("SRIOV Test Case 20 running")
     isPassed= False
     message=""
-    server1_id=server_floating_ip_id=server2_floating_ip_id=""   
+    server_1_id=server_floating_ip_id=port_1_id=""   
     try:
         #search and create server
         compute1 =  [key for key, val in baremetal_node_ips.items() if "compute-1" in key]
@@ -945,7 +966,7 @@ def sriov_test_case_20(nova_ep, neutron_ep, image_ep, token, settings, baremetal
         server_build_wait(nova_ep, token, [server_1_id])
         status1= check_server_status(nova_ep, token, server_1_id)
         if  status1 == "error":
-            logging.error("Test Case 32 failed")
+            logging.error("Test Case 20 failed")
             logging.error("Instances creation failed")
             message="one of the instance creation failed, insatnce 1 status is {}".format(status1)
         else:
@@ -975,39 +996,95 @@ def sriov_test_case_20(nova_ep, neutron_ep, image_ep, token, settings, baremetal
                 if stderr == "" and "icmp_seq=3 Destination Host Unreachable" not in stdout:
                     isPassed= True
                     logging.info ("Ping successfull!")
-                    logging.info("DVR test Case 32 Passed")
-                    message="DVR testcase 32 passed, cold migration of instance is successfull, status code is {}, old host {}, new host {} \n, ping status is: \n {}".format(response, compute1, new_host, stdout)
+                    logging.info("SRIOV test Case 20 Passed")
+                    message="SRIOV testcase 20 passed, cold migration of instance is successfull, status code is {}, old host {}, new host {} \n, ping status is: \n {}".format(response, compute1, new_host, stdout)
                 else:
-                    logging.error("DVR test Case 32 failed, ping failed after cold migration, status code is {}, old host name is {}, new host name is : {} \n ping status is: \n {}".format(response, compute1, new_host, stdout))
-                    message= "DVR test Case 32 failed, ping failed after cold migration, status code is {}, old host name is {}, new host name is : {} \n ping status is: \n {}".format(response, compute1, new_host, stdout)
+                    logging.error("SRIOV test Case 20 failed, ping failed after cold migration, status code is {}, old host name is {}, new host name is : {} \n ping status is: \n {}".format(response, compute1, new_host, stdout))
+                    message= "SRIOV test Case 20 failed, ping failed after cold migration, status code is {}, old host name is {}, new host name is : {} \n ping status is: \n {}".format(response, compute1, new_host, stdout)
             else:
-                logging.error("cold vmigration of instance failed, status code is {}, old host name is {}, new host name is : {}".format(response, compute1, new_host))
-                message="cold migration of instance failed, status code is {},  old host name is {}, new host name is : {} ".format(response, compute1, new_host)
+                logging.error("SRIOV test Case 20 failed, cold vmigration of instance failed, status code is {}, old host name is {}, new host name is : {}".format(response, compute1, new_host))
+                message="SRIOV test Case 20 failed, cold migration of instance failed, status code is {},  old host name is {}, new host name is : {} ".format(response, compute1, new_host)
         
-        logging.info("deleting flavor")
-        delete_resource("{}/v2.1/flavors/{}".format(nova_ep,flavor_id), token)
-        logging.info("deleting all servers")
-        delete_resource("{}/v2.1/servers/{}".format(nova_ep,server_1_id), token)
-        time.sleep(10)
-        logging.info("releasing floating ip")
-        delete_resource("{}/v2.0/floatingips/{}".format(neutron_ep, server_floating_ip_id), token)
- 
+        if(server_1_id != ""):
+            logging.info("deleting all servers")
+            delete_resource("{}/v2.1/servers/{}".format(nova_ep,server_1_id), token)
+        if(server_floating_ip_id ==""):
+            logging.info("releasing floating ip")
+            delete_resource("{}/v2.0/floatingips/{}".format(neutron_ep, server_floating_ip_id), token)
+        if(port_1_id != ""):
+            delete_resource("{}/v2.0/ports/{}".format(neutron_ep,port_1_id), token)
+
     except Exception as e:
-        logging.exception("DVR test Case 32 failed/ error occured")
-        message="DVR testcase 32 failed/ error occured {}".format(e)
+        logging.exception("SRIOV test Case 20 failed/ error occured")
+        message="SRIOV testcase 20 failed/ error occured {}".format(e)
         logging.exception(e)
         logging.error(e)
-        if(flavor_id != ""):
-            logging.info("deleting flavor")
-            delete_resource("{}/v2.1/flavors/{}".format(nova_ep,flavor_id), token)
         if(server_1_id != ""):
             logging.info("deleting all servers")
             delete_resource("{}/v2.1/servers/{}".format(nova_ep,server_1_id), token)
         if(server_floating_ip_id ==""):
             logging.info("releasing floating ip")
             delete_resource("{}/v2.0/floatingips/{}".format(neutron_ep, server_floating_ip_id), token)    
-    logging.info("DVR Test Case 32 finished")
+        if(port_1_id != ""):
+            delete_resource("{}/v2.0/ports/{}".format(neutron_ep,port_1_id), token)
+
+    logging.info("SRIOV Test Case 20 finished")
     return isPassed, message
+
+def sriov_volume_test_case(nova_ep, neutron_ep, image_ep, cinder_ep, keystone_ep, token, settings, baremetal_node_ips, flavor_id, network1_id, security_group_id, image_id):
+    message=""
+    testcases_passed= 0
+    logging.info("starting volume testcases")
+    server1_id=floating_1_ip_id=port_1_id=port_2_id=""
+    compute0 =  [key for key, val in baremetal_node_ips.items() if "compute-0" in key]
+    compute0= compute0[0]
+    compute1 =  [key for key, val in baremetal_node_ips.items() if "compute-1" in key]
+    compute1= compute1[0]
+
+    try:
+        port_1_id, port_1_ip= create_port(neutron_ep, token, network_id, subnet_id, "test_case_port_1" )
+        port_2_id, port_2_ip= create_port(neutron_ep, token, network_id, subnet_id, "test_case_port_2" )
+        server1_id= search_and_create_sriov_server(nova_ep, token, "test_case_Server1", image_id, settings["key_name"], flavor_id,  port_1_id, "nova0", security_group_id, compute0)
+        server_build_wait(nova_ep, token, [server1_id])
+        status1= check_server_status(nova_ep, token, server1_id)
+        if status1 == "active":
+            server1_ip= get_server_ip(nova_ep, token, server1_id, settings["network1_name"])
+            server1_port= get_ports(neutron_ep, token, network1_id, server1_ip)
+            public_network_id= search_network(neutron_ep, token, settings["external_network_name"])
+            public_subnet_id= search_subnet(neutron_ep, token, settings["external_subnet"])
+            flaoting_1_ip, floating_1_ip_id= create_floating_ip(neutron_ep, token, public_network_id, public_subnet_id, port_1_ip, port_1_id)
+            testcases_passed, message= volume_test_cases(image_ep, cinder_ep, keystone_ep, nova_ep, token, settings, baremetal_node_ips, server1_id, flaoting_1_ip,  flavor_id, port_2_id, security_group_id, compute1, True) 
+        else:
+            logging.info("volume testcases skipped, becuase server is not created")
+            message= "volume testcases skipped, becuase server is not created"
+        if(server1_id != ""):
+            logging.info("deleting all servers")
+            delete_resource("{}/v2.1/servers/{}".format(nova_ep,server1_id), token) 
+        if(floating_1_ip_id !=""):
+            logging.info("releasing floating ip")
+            delete_resource("{}/v2.0/floatingips/{}".format(neutron_ep, floating_1_ip_id), token)
+        if(port_1_id != ""):
+            delete_resource("{}/v2.0/ports/{}".format(neutron_ep,port_1_id), token)
+        if(port_2_id != ""):
+            delete_resource("{}/v2.0/ports/{}".format(neutron_ep,port_2_id), token)
+
+    except Exception as e:
+        logging.exception(e)
+        message= "volume testcases skipped, error/exception occured {}".format(str(e))
+        if(server1_id != ""):
+            logging.info("deleting all servers")
+            delete_resource("{}/v2.1/servers/{}".format(nova_ep,server1_id), token) 
+        if(floating_1_ip_id !=""):
+            logging.info("releasing floating ip")
+            delete_resource("{}/v2.0/floatingips/{}".format(neutron_ep, floating_1_ip_id), token)
+        if(port_1_id != ""):
+            delete_resource("{}/v2.0/ports/{}".format(neutron_ep,port_1_id), token)
+        if(port_2_id != ""):
+            delete_resource("{}/v2.0/ports/{}".format(neutron_ep,port_1_id), token)
+
+
+    
+    return testcases_passed, message
 
 
 

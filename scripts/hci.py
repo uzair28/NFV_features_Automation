@@ -2,6 +2,7 @@ from openstack_functions import *
 import logging
 import os
 import time
+from volume import *
 
 def hci_test_case_3(nova_ep, neutron_ep, image_ep, token, settings, baremetal_node_ips,  keypair_public_key, network_id, subnet_id, security_group_id, image_id, flavor_id):  
     logging.info("HCI Test Case 3 running")
@@ -111,10 +112,10 @@ def hci_test_case_4(nova_ep, neutron_ep, image_ep, token, settings, baremetal_no
             wait_instance_ssh(server2_floating_ip, settings)
             logging.info("ssh into server1")
             command= "ping  -c 3 {}".format(server2_floating_ip)
-            result1, error1= instance_ssh(server_floating_ip, server2_floating_ip, settings, command)
+            result1, error1= instance_ssh(server_floating_ip, settings, command)
             logging.info("ssh into server2")
             command= "ping  -c 3 {}".format(server_floating_ip)
-            result2, error2= instance_ssh(server2_floating_ip, server_floating_ip, settings, command)
+            result2, error2= instance_ssh(server2_floating_ip, settings, command)
 
         if error1 =="" and error2 == "":
             isPassed=True     
@@ -206,10 +207,10 @@ def hci_test_case_5(nova_ep, neutron_ep, image_ep, token, settings, baremetal_no
             wait_instance_ssh(server2_floating_ip, settings)
             logging.info("ssh into server1")
             command= "ping  -c 3 {}".format(server2_floating_ip)
-            result1, error1= instance_ssh(server_floating_ip, server2_floating_ip, settings, command)
+            result1, error1= instance_ssh(server_floating_ip, settings, command)
             logging.info("ssh into server2")
             command= "ping  -c 3 {}".format(server_floating_ip)
-            result2, error2= instance_ssh(server2_floating_ip, server_floating_ip, settings, command)
+            result2, error2= instance_ssh(server2_floating_ip, settings, command)
 
             if error1 =="" and error2 == "":
                 isPassed=True     
@@ -302,10 +303,10 @@ def hci_test_case_6(nova_ep, neutron_ep, image_ep, token, settings, baremetal_no
             wait_instance_ssh(server2_floating_ip, settings)
             logging.info("ssh into server1")
             command= "ping  -c 3 {}".format(server2_floating_ip)
-            result1, error1= instance_ssh(server_floating_ip, server2_floating_ip, settings, command)
+            result1, error1= instance_ssh(server_floating_ip, settings, command)
             logging.info("ssh into server2")
             command= "ping  -c 3 {}".format(server_floating_ip)
-            result2, error2= instance_ssh(server2_floating_ip, server_floating_ip, settings, command)
+            result2, error2= instance_ssh(server2_floating_ip, settings, command)
 
             if error1 =="" and error2 == "":
                 isPassed=True     
@@ -395,10 +396,10 @@ def hci_test_case_7(nova_ep, neutron_ep, image_ep, token, settings, baremetal_no
             wait_instance_ssh(server2_floating_ip, settings)
             logging.info("ssh into server1")
             command= "ping  -c 3 {}".format(server2_floating_ip)
-            result1, error1= instance_ssh(server_floating_ip, server2_floating_ip, settings,command)
+            result1, error1= instance_ssh(server_floating_ip, settings,command)
             logging.info("ssh into server2")
             command= "ping  -c 3 {}".format(server_floating_ip)
-            result2, error2= instance_ssh(server2_floating_ip, server_floating_ip, settings, command)
+            result2, error2= instance_ssh(server2_floating_ip, settings, command)
 
             if error1 =="" and error2 == "":
                 isPassed=True     
@@ -673,3 +674,46 @@ def hci_test_case_10(nova_ep, neutron_ep, image_ep, cinder_ep, keystone_ep, toke
             time.sleep(5)
     logging.info("HCI Test Case 10 finished")
     return isPassed, message
+
+def hci_volume_test_case(nova_ep, neutron_ep, image_ep, cinder_ep, keystone_ep, token, settings, baremetal_node_ips, flavor_id, network1_id, security_group_id, image_id):
+    message=""
+    testcases_passed= 0
+    logging.info("starting volume testcases")
+    server1_id=floating_1_ip_id=""
+    compute0 =  [key for key, val in baremetal_node_ips.items() if "hci-0" in key]
+    compute0= compute0[0]
+    compute1 =  [key for key, val in baremetal_node_ips.items() if "hci-1" in key]
+    compute1= compute1[0]
+
+    try:
+        server1_id= search_and_create_server(nova_ep, token, "test_case_Server1", image_id,settings["key_name"], flavor_id, network1_id, security_group_id, compute0)
+        server_build_wait(nova_ep, token, [server1_id])
+        status1= check_server_status(nova_ep, token, server1_id)
+        if status1 == "active":
+            server1_ip= get_server_ip(nova_ep, token, server1_id, settings["network1_name"])
+            server1_port= get_ports(neutron_ep, token, network1_id, server1_ip)
+            public_network_id= search_network(neutron_ep, token, settings["external_network_name"])
+            public_subnet_id= search_subnet(neutron_ep, token, settings["external_subnet"])
+            flaoting_1_ip, floating_1_ip_id= create_floating_ip(neutron_ep, token, public_network_id, public_subnet_id, server1_ip, server1_port)
+            testcases_passed, message= volume_test_cases(image_ep, cinder_ep, keystone_ep, nova_ep, token, settings, baremetal_node_ips, server1_id, flaoting_1_ip,  flavor_id, network1_id, security_group_id, compute1) 
+        else:
+            logging.info("volume testcases skipped, becuase server is not created")
+            message= "volume testcases skipped, becuase server is not created"
+        if(server1_id != ""):
+            logging.info("deleting all servers")
+            delete_resource("{}/v2.1/servers/{}".format(nova_ep,server1_id), token) 
+        if(floating_1_ip_id !=""):
+            logging.info("releasing floating ip")
+            delete_resource("{}/v2.0/floatingips/{}".format(neutron_ep, floating_1_ip_id), token)
+  
+    except Exception as e:
+        logging.exception(e)
+        message= "volume testcases skipped, error/exception occured {}".format(str(e))
+        if(server1_id != ""):
+            logging.info("deleting all servers")
+            delete_resource("{}/v2.1/servers/{}".format(nova_ep,server1_id), token) 
+        if(floating_1_ip_id !=""):
+            logging.info("releasing floating ip")
+            delete_resource("{}/v2.0/floatingips/{}".format(neutron_ep, floating_1_ip_id), token)
+    
+    return testcases_passed, message

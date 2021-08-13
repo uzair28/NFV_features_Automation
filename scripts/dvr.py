@@ -900,7 +900,7 @@ def dvr_test_case_32(nova_ep, neutron_ep, image_ep, token, settings, baremetal_n
             delete_resource("{}/v2.0/floatingips/{}".format(neutron_ep, server_floating_ip_id), token)            
     except Exception as e:
         logging.exception("DVR test Case 32 failed/ error occured")
-        message= metadata+" DVR testcase 32 failed/ error occured {}".format(e)
+        message= message+" DVR testcase 32 failed/ error occured {}".format(e)
         logging.exception(e)
         logging.error(e)
         
@@ -913,14 +913,48 @@ def dvr_test_case_32(nova_ep, neutron_ep, image_ep, token, settings, baremetal_n
     logging.info("DVR Test Case 32 finished")
     return isPassed, message
 
-def dvr_volume_test_case(nova_ep, neutron_ep, image_ep, cinder_ep, keystone_ep, token, settings, baremetal_node_ips):
+def dvr_volume_test_case(nova_ep, neutron_ep, image_ep, cinder_ep, keystone_ep, token, settings, baremetal_node_ips, flavor_id, network1_id, security_group_id, image_id):
+    message=""
+    testcases_passed= 0
     logging.info("starting volume testcases")
-    server1_id= "e79071c7-a302-4b4f-b8ae-b82456c53ff7"
-    server2_id= "299182c3-bb2c-4bbf-af84-4e4ae6602b4e"
-    floating_ip= "100.67.62.98"
-    message, message2= volume_test_cases(cinder_ep, keystone_ep, nova_ep, token, settings, baremetal_node_ips, server1_id, server2_id, floating_ip)
-    print(message)
-    print(message2)
+    server1_id=floating_1_ip_id=""
+    compute0 =  [key for key, val in baremetal_node_ips.items() if "compute-0" in key]
+    compute0= compute0[0]
+    compute1 =  [key for key, val in baremetal_node_ips.items() if "compute-1" in key]
+    compute1= compute1[0]
+
+    try:
+        server1_id= search_and_create_server(nova_ep, token, "test_case_Server1", image_id,settings["key_name"], flavor_id, network1_id, security_group_id, compute0)
+        server_build_wait(nova_ep, token, [server1_id])
+        status1= check_server_status(nova_ep, token, server1_id)
+        if status1 == "active":
+            server1_ip= get_server_ip(nova_ep, token, server1_id, settings["network1_name"])
+            server1_port= get_ports(neutron_ep, token, network1_id, server1_ip)
+            public_network_id= search_network(neutron_ep, token, settings["external_network_name"])
+            public_subnet_id= search_subnet(neutron_ep, token, settings["external_subnet"])
+            flaoting_1_ip, floating_1_ip_id= create_floating_ip(neutron_ep, token, public_network_id, public_subnet_id, server1_ip, server1_port)
+            testcases_passed, message= volume_test_cases(image_ep, cinder_ep, keystone_ep, nova_ep, token, settings, baremetal_node_ips, server1_id, flaoting_1_ip,  flavor_id, network1_id, security_group_id, compute1) 
+        else:
+            logging.info("volume testcases skipped, becuase server is not created")
+            message= "volume testcases skipped, becuase server is not created"
+        if(server1_id != ""):
+            logging.info("deleting all servers")
+            delete_resource("{}/v2.1/servers/{}".format(nova_ep,server1_id), token) 
+        if(floating_1_ip_id !=""):
+            logging.info("releasing floating ip")
+            delete_resource("{}/v2.0/floatingips/{}".format(neutron_ep, floating_1_ip_id), token)
+  
+    except Exception as e:
+        logging.exception(e)
+        message= "volume testcases skipped, error/exception occured {}".format(str(e))
+        if(server1_id != ""):
+            logging.info("deleting all servers")
+            delete_resource("{}/v2.1/servers/{}".format(nova_ep,server1_id), token) 
+        if(floating_1_ip_id !=""):
+            logging.info("releasing floating ip")
+            delete_resource("{}/v2.0/floatingips/{}".format(neutron_ep, floating_1_ip_id), token)
+    
+    return testcases_passed, message
 
 
 

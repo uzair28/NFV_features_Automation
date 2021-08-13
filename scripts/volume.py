@@ -14,7 +14,7 @@ def volume_build_wait(cinder_ep, token, volume_ids, project_id):
         if flag==0:
             break
 
-def volume_test_cases(image_ep, cinder_ep, keystone_ep, nova_ep, token, settings, baremetal_node_ips, server1_id, server_floating_ip, flavor_id, network_id, security_group_id, compute1):  
+def volume_test_cases(image_ep, cinder_ep, keystone_ep, nova_ep, token, settings, baremetal_node_ips, server1_id, server_floating_ip, flavor_id, network_id, security_group_id, compute1, sriov=False):  
     project_id= find_admin_project_id(keystone_ep, token)
     test1=test2=test3=test4=test5=test6=test7=test8=test9=test10=test11=test12=""
    
@@ -94,7 +94,12 @@ def volume_test_cases(image_ep, cinder_ep, keystone_ep, nova_ep, token, settings
 
             #Now create instance from snapshot
             logging.info("creating instance from snapshot")
-            snapshot_server_id= search_and_create_server(nova_ep, token, "testcase_server_from_snapshot", instance_snapshot_id, settings["key_name"], flavor_id, network_id, security_group_id) 
+            if(sriov==False):
+                snapshot_server_id= search_and_create_server(nova_ep, token, "testcase_server_from_snapshot", instance_snapshot_id, settings["key_name"], flavor_id, network_id, security_group_id) 
+            else:
+                snapshot_server_id= search_and_create_sriov_server(nova_ep, token, "testcase_server_from_snapshot", image_id, settings["key_name"], flavor_id,  network_id, "nova0", security_group_id, compute1)
+
+
             server_build_wait(nova_ep, token, [snapshot_server_id])
             status= check_server_status(nova_ep, token, snapshot_server_id) 
             if status== "active":
@@ -237,23 +242,23 @@ def cold_migrate_instance(nova_ep, token, server1_id, server_floating_ip):
         if response==202:
             logging.info("confirming migrate")
             perform_action_on_server(nova_ep,token, server1_id, "confirmResize")
-            logging.info("migration status code is: {}".format(response))
-            logging.info("waiting for migration")
-            time.sleep(30)
-            wait_instance_boot(server_floating_ip)
-            new_host= get_server_host(nova_ep, token, server1_id)
-            logging.info("new host is: "+new_host)
-            if(response == 202 and new_host != old_host):
-                response2 = os.system("ping -c 3 " + server_floating_ip)
-                if response2 == 0:
-                    isPassed= True
-                    logging.info ("Ping successfull!")
-                    message="\n Volume Testcase 4 passed, cold migration of instance is successfull when volume is attached, status code is {}, old host {}, new host {} \n".format(response, old_host, new_host)
-                else:
-                    message= "\n Volume Testcase 4 failed, cold migration failed when volume is attached, ping failed after cold migration"
+        logging.info("migration status code is: {}".format(response))
+        logging.info("waiting for migration")
+        time.sleep(30)
+        wait_instance_boot(server_floating_ip)
+        new_host= get_server_host(nova_ep, token, server1_id)
+        logging.info("new host is: "+new_host)
+        if(response == 202 and new_host != old_host):
+            response2 = os.system("ping -c 3 " + server_floating_ip)
+            if response2 == 0:
+                isPassed= True
+                logging.info ("Ping successfull!")
+                message="\n Volume Testcase 4 passed, cold migration of instance is successfull when volume is attached, status code is {}, old host {}, new host {} \n".format(response, old_host, new_host)
             else:
-                logging.error("\n Volume Testcase 4 failed, cold migration of instance failed when volume is attached, status code is {}, old host name is {}, new host name is : {}".format(response, old_host, new_host))
-                message="\n Volume Testcase 4 failed, cold migration of instance failed when volume is attached, status code is {},  old host name is {}, new host name is : {}".format(response, old_host, new_host)
+                message= "\n Volume Testcase 4 failed, cold migration failed when volume is attached, ping failed after cold migration"
+        else:
+            logging.error("\n Volume Testcase 4 failed, cold migration of instance failed when volume is attached, status code is {}, old host name is {}, new host name is : {}".format(response, old_host, new_host))
+            message="\n Volume Testcase 4 failed, cold migration of instance failed when volume is attached, status code is {},  old host name is {}, new host name is : {}".format(response, old_host, new_host)
         logging.info("restrting instance to ensure it is pingable")
         reboot_server(nova_ep,token, server1_id)
         time.sleep(10)
@@ -269,7 +274,7 @@ def live_migrate_instance(nova_ep, token, server1_id, server_floating_ip, host):
         old_host= get_server_host(nova_ep, token, server1_id)
         logging.info("old host is {}".format(old_host))
         logging.info("live migrating server")
-        response= live_migrate_server(nova_ep,token, server1_id, host)
+        response= live_migrate_server(nova_ep,token, server1_id, host, "true")
         logging.info("migration status code is: {}".format(response))
         logging.info("waiting for migration")
         time.sleep(30)
@@ -288,7 +293,7 @@ def live_migrate_instance(nova_ep, token, server1_id, server_floating_ip, host):
                 message= "\n Volume Testcase 3 failed when volume is attached, ping failed after live migration"
         else:
             logging.error("\n Volume Testcase 3 failed, live migration of instance failed when volume is attached, status code is {},  old host name is {}, new host name is : {}".format(response, old_host, new_host))
-            message="\n Volume Testcase 3 failed, live migration of instance failed when volume is attached, status code is {},  old host name is {}, new host name is : {}".format(response, old_host, new_host)
+            message= "\n Volume Testcase 3 failed, live migration of instance failed when volume is attached, status code is {},  old host name is {}, new host name is : {}".format(response, old_host, new_host)
         logging.info("restrting instance to ensure it is pingable")
         reboot_server(nova_ep,token, server1_id)
         time.sleep(10)

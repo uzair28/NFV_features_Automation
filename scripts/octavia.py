@@ -827,7 +827,6 @@ def octavia_test_case_27(nova_ep, neutron_ep, image_ep, loadbal_ep, token, setti
     logging.info("Octavia testcase 27 finished")
     return isPassed, message
     
-
 def octavia_test_case_28(nova_ep, neutron_ep, image_ep, loadbal_ep, token, settings, baremetal_node_ips,  keypair_public_key, network_id, subnet_id, router_id, security_group_id, image_id):
     isPassed= False
     message= ""    

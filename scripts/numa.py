@@ -118,7 +118,7 @@ def numa_test_case_5_6_9(nova_ep, neutron_ep, image_ep, token, settings, baremet
                 isPassed9_1=True
                 logging.info("Server Creation Failed when other servers paused")
                 logging.info("Test case 9 passed when other servers are paused")
-            logging.info("deleting server")
+            logging.info("deleting extra server")
             delete_resource("{}/v2.1/servers/{}".format(nova_ep,server_id), token)
             
             logging.info("unpause servers")
@@ -139,7 +139,7 @@ def numa_test_case_5_6_9(nova_ep, neutron_ep, image_ep, token, settings, baremet
             if (server_status== "error"):
                 logging.info("Server Creation Failed when other servers suspended")
                 isPassed9_2=True
-            logging.info("deleting server")
+            logging.info("deleting extra server")
             if( server_id!= ""):
                 delete_resource("{}/v2.1/servers/{}".format(nova_ep,server_id), token)
                 
@@ -161,7 +161,8 @@ def numa_test_case_5_6_9(nova_ep, neutron_ep, image_ep, token, settings, baremet
                 logging.info("Server Creation Failed when other servers shutdown")
                 logging.info("Test case 9 passed when other servers are shutdown")
                 isPassed9_3=True
-
+            logging.info("deleting extra server")
+            delete_resource("{}/v2.1/servers/{}".format(nova_ep,server_id), token)
             
             if isPassed9_1== True and isPassed9_2== True and  isPassed9_3== True:
                 isPassed9=True
@@ -626,7 +627,7 @@ def numa_volume_test_case(nova_ep, neutron_ep, image_ep, cinder_ep, keystone_ep,
             public_network_id= search_network(neutron_ep, token, settings["external_network_name"])
             public_subnet_id= search_subnet(neutron_ep, token, settings["external_subnet"])
             flaoting_1_ip, floating_1_ip_id= create_floating_ip(neutron_ep, token, public_network_id, public_subnet_id, server1_ip, server1_port)
-            testcases_passed, message= volume_test_cases(cinder_ep, keystone_ep, nova_ep, token, settings, baremetal_node_ips, server1_id, flaoting_1_ip,  flavor_id, network1_id, security_group_id, compute1) 
+            testcases_passed, message= volume_test_cases(image_ep, cinder_ep, keystone_ep, nova_ep, token, settings, baremetal_node_ips, server1_id, flaoting_1_ip,  flavor_id, network1_id, security_group_id, compute1) 
         else:
             logging.info("volume testcases skipped, becuase server is not created")
             message= "volume testcases skipped, becuase server is not created"

@@ -544,15 +544,15 @@ def reboot_server(nova_ep,token, server_id):
     logging.info(response.text)
     return response.status_code
 
-def live_migrate_server(nova_ep,token, server_id, host=None):
+def live_migrate_server(nova_ep,token, server_id, host=None, block_migration="auto"):
     payload= {
         "os-migrateLive": {
-            "block_migration": "auto",
+            "block_migration": block_migration,
             "host": host
         }
         }
-
     response=send_post_request("{}/v2.1/servers/{}/action".format(nova_ep, server_id), token, payload)
+    print(response.text)
     logging.info(response.text)
     return response.status_code
 
@@ -640,13 +640,27 @@ def search_volume(storage_ep, token, volume_name, project_id):
 '''
 Volume
 '''
-def create_volume(storage_ep, token, project_id, volume_name, volume_size, availability_zone=None):
+
+def get_volume_metadata(storage_ep, token, volume_id, project_id):
+    response= send_get_request("{}/v3/{}/volumes/{}".format(storage_ep, project_id,volume_id), token)
+    print(response.text)
+    logging.info("successfully received volume list") if response.ok else response.raise_for_status()
+    data= response.json()
+
+    return data["volume"]["volume_image_metadata"]
+
+def create_volume(storage_ep, token, project_id, volume_name, volume_size, image_id=None):
     payload= {"volume":{
                 "size": volume_size,
                 "project_id":project_id,
                 "name": volume_name
                 }
             }
+    payload2={
+        "imageRef": image_id
+    }
+    if image_id is not None:
+        payload= {"volume":{**payload["volume"], **payload2}}
     response= requests.post("{}/v3/{}/volumes".format(storage_ep, project_id), headers= {'content-type': "application/json", 'X-Auth-Token': token}, data=json.dumps(payload))
     logging.debug(response.text)
     print(response.text)
@@ -681,10 +695,10 @@ def migrate_voume(storage_ep, token, project_id, volume_id):
     else:
         return False
 
-def search_and_create_volume(storage_ep, token, project_id, volume_name, volume_size, availability_zone=None):
+def search_and_create_volume(storage_ep, token, project_id, volume_name, volume_size, image_id=None):
     volume_id= search_volume(storage_ep, token, volume_name, project_id)
     if volume_id is None:
-        volume_id= create_volume(storage_ep, token, project_id, volume_name, volume_size, )
+        volume_id= create_volume(storage_ep, token, project_id, volume_name, volume_size, image_id )
     logging.debug("Volume id: "+volume_id)    
     return volume_id
 def check_volume_status(storage_ep, token, volume_id, project_id):

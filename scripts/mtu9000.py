@@ -382,12 +382,13 @@ def mtu9000_test_case_14(nova_ep, neutron_ep, image_ep, token, settings, baremet
     logging.info("MTU9000 Test Case 14")
     isPassed= False
     message=server_1_id=server_2_id=floating_1_ip_id= floating_2_ip_id=""
-    compute0 =  [key for key, val in baremetal_node_ips.items() if "compute-0" in key]
-    compute0= compute0[0]
-    compute1 =  [key for key, val in baremetal_node_ips.items() if "compute-1" in key]
-    compute1= compute1[0]
+    
     #search and create server
     try:
+        compute0 =  [key for key, val in baremetal_node_ips.items() if "compute-0" in key]
+        compute0= compute0[0]
+        compute1 =  [key for key, val in baremetal_node_ips.items() if "compute-1" in key]
+        compute1= compute1[0]
         server_1_id= search_and_create_server(nova_ep, token, "test_case_Server1", image_id,settings["key_name"], flavor_id, network_id, security_group_id, compute0)
         server_2_id= search_and_create_server(nova_ep, token, "test_case_Server2", image_id,settings["key_name"], flavor_id, network_id, security_group_id, compute1)
         server_build_wait(nova_ep, token, [server_1_id, server_2_id])
@@ -609,11 +610,9 @@ def mtu9000_volume_test_case(nova_ep, neutron_ep, image_ep, cinder_ep, keystone_
     logging.info("starting volume testcases")
     server1_id=floating_1_ip_id=""
     compute0 =  [key for key, val in baremetal_node_ips.items() if "compute-0" in key]
-    print(compute0)
     compute0= compute0[0]
     compute1 =  [key for key, val in baremetal_node_ips.items() if "compute-1" in key]
     compute1= compute1[0]
-    print(compute1)
 
     try:
         server1_id= search_and_create_server(nova_ep, token, "test_case_Server1", image_id,settings["key_name"], flavor_id, network1_id, security_group_id, compute0)
