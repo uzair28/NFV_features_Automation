@@ -1053,7 +1053,7 @@ def sriov_volume_test_case(nova_ep, neutron_ep, image_ep, cinder_ep, keystone_ep
             server1_port= get_ports(neutron_ep, token, network1_id, server1_ip)
             public_network_id= search_network(neutron_ep, token, settings["external_network_name"])
             public_subnet_id= search_subnet(neutron_ep, token, settings["external_subnet"])
-            flaoting_1_ip, floating_1_ip_id= create_floating_ip(neutron_ep, token, public_network_id, public_subnet_id, port_1_ip, port_1_id)
+            flaoting_1_ip, floating_1_ip_id= create_floating_ip(neutron_ep, token, public_network1_id, public_subnet_id, port_1_ip, port_1_id)
             testcases_passed, message= volume_test_cases(image_ep, cinder_ep, keystone_ep, nova_ep, token, settings, baremetal_node_ips, server1_id, flaoting_1_ip,  flavor_id, port_2_id, security_group_id, compute1, True) 
         else:
             logging.info("volume testcases skipped, becuase server is not created")
