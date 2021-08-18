@@ -106,7 +106,7 @@ def create_port(neutron_ep, token, network_id, subnet_id, name, property=None ):
     if property is not None:
         payload= {"port":{**payload["port"], **payload_port_property}}
     response= send_post_request('{}/v2.0/ports'.format(neutron_ep), token, payload)
-    print(response.text)
+    logging.debug(response.text)
     logging.info("successfully created port") if response.ok else response.raise_for_status()
     data=response.json()
     return data["port"]["id"], data["port"]["fixed_ips"][0]["ip_address"]
@@ -200,7 +200,7 @@ def put_extra_specs_in_flavor(nova_ep, token, flavor_id,is_numa, mem_page_size="
 
         }
     response= send_post_request("{}/v2.1/flavors/{}/os-extra_specs".format(nova_ep, flavor_id), token, payload)
-    print(response.text)
+    logging.debug(response.text)
     logging.info("successfully added extra specs to  flavor {}".format(flavor_id)) if response.ok else response.raise_for_status()
 def put_ovs_dpdk_specs_in_flavor(nova_ep, token, flavor_id):
     payload={
@@ -241,7 +241,7 @@ def create_router(neutron_ep, token, router_name, network_id, subnet_id):
 
     }
     response= send_post_request('{}/v2.0/routers'.format(neutron_ep), token, payload)
-    print(response.text)
+    logging.debug(response.text)
     logging.info("successfully created router {}".format(router_name)) if response.ok else response.raise_for_status()  
     data= response.json()
     return data['router']['id']
@@ -249,7 +249,7 @@ def set_router_gateway(neutron_ep, token, router_id, network_id):
     print(router_id)
     payload={"router": {"external_gateway_info": {"network_id": network_id}}}
     response= send_post_request("{}/v2.0/routers/{}".format(neutron_ep,router_id), token, payload)
-    print(response.text)
+    logging.debug(response.text)
     logging.info("successfully set gateway to router {}".format(router_id)) if response.ok else response.raise_for_status()  
 def add_interface_to_router(neutron_ep, token, router_id, subnet_id):
     payload={
@@ -257,7 +257,7 @@ def add_interface_to_router(neutron_ep, token, router_id, subnet_id):
     }
     
     response= send_put_request('{}/v2.0/routers/{}/add_router_interface'.format(neutron_ep,router_id), token, payload)
-    print(response.text)
+    logging.debug(response.text)
     logging.info("successfully added interface to router {}".format(router_id)) if response.ok else response.raise_for_status()  
 def remove_interface_to_router(neutron_ep, token, router_id, subnet_id):
     payload={
@@ -265,7 +265,7 @@ def remove_interface_to_router(neutron_ep, token, router_id, subnet_id):
     }
     
     response= send_put_request('{}/v2.0/routers/{}/remove_router_interface'.format(neutron_ep,router_id), token, payload)
-    print(response.text)
+    logging.debug(response.text)
     logging.info("successfully removed interface from router {}".format(router_id)) if response.ok else response.raise_for_status()  
 
 def get_default_security_group_id(neutron_ep, token, project_id):
@@ -391,7 +391,7 @@ def upload_file_to_image(image_ep, token, image_file, image_id):
     #response = send_put_request("{}/v2.1/images/{}/file".format(image_ep, image_id), token, image_file, "application/octet-stream")
     try:
         response= requests.put("{}/v2.1/images/{}/file".format(image_ep, image_id), headers= {'content-type':"application/octet-stream", 'X-Auth-Token': token}, data=image_file)
-        print(response.text)
+        logging.debug(response.text)
     except Exception as e:
         logging.error( "request processing failure ", stack_info=True)
         print(e)
@@ -441,7 +441,7 @@ def create_server(nova_ep, token, server_name, image_id, keypair_name, flavor_id
     if availability_zone is not None:
         payload= {"server":{**payload["server"], **payload_availability_zone}}
     response = send_post_request('{}/v2.1/servers'.format(nova_ep), token, payload)
-    print(response.text)
+    logging.debug(response.text)
     logging.info("successfully created server {}".format(server_name)) if response.ok else  response.raise_for_status()
     data= response.json()
     return data["server"]["links"][0]["href"]  
@@ -457,7 +457,7 @@ def create_sriov_server(nova_ep, token, server_name, image_id, keypair_name, fla
     if host is not None:
         payload= {"server":{**payload["server"], **payload_manual_host}}
     response = send_post_request('{}/v2.1/servers'.format(nova_ep), token, payload)
-    print(response.text)
+    logging.debug(response.text)
     logging.info("successfully created sriov server {}".format(server_name)) if response.ok else  response.raise_for_status()
     data= response.json()
     return data["server"]["links"][0]["href"]  
@@ -474,7 +474,7 @@ def get_server_host(nova_ep, token, server_id):
 
 def check_server_status(nova_ep, token, server_id):
     response = send_get_request("{}/v2.1/servers/{}".format(nova_ep, server_id), token)
-    print(response.text)
+    logging.debug(response.text)
     data= response.json()
     return data["server"]["OS-EXT-STS:vm_state"] if response.ok else response.raise_for_status()
 
@@ -488,7 +488,7 @@ def parse_server_ip(data, network, network_type):
 def get_server_ip(nova_ep, token, server_id, network):
     
     response = send_get_request('{}/v2.1/servers/{}'.format(nova_ep, server_id), token)
-    print(response.text)
+    logging.debug(response.text)
     logging.info("received server network detail") if response.ok else response.raise_for_status()
     return parse_server_ip(response, network, "fixed")
 
@@ -517,7 +517,7 @@ def create_server_snapshot (nova_ep,token, server_id, snapshot_name):
     }
     
     response= send_post_request("{}/v2.1/servers/{}/action".format(nova_ep, server_id), token, payload)
-    print(response.text)
+    logging.debug(response.text)
     if(response.status_code == 202):
         data= response.json()
         return data["image_id"]
@@ -532,7 +532,7 @@ def resize_server(nova_ep,token, server_id, flavor_id):
         }
     }
     response= send_post_request("{}/v2.1/servers/{}/action".format(nova_ep, server_id), token, payload)
-    print(response.text)
+    logging.debug(response.text)
     return response.status_code
 def reboot_server(nova_ep,token, server_id):
     payload={
@@ -541,7 +541,7 @@ def reboot_server(nova_ep,token, server_id):
          }
     }
     response=send_post_request("{}/v2.1/servers/{}/action".format(nova_ep, server_id), token, payload)
-    logging.info(response.text)
+    logging.debug(response.text)
     return response.status_code
 
 def live_migrate_server(nova_ep,token, server_id, host=None, block_migration="auto"):
@@ -552,14 +552,14 @@ def live_migrate_server(nova_ep,token, server_id, host=None, block_migration="au
         }
         }
     response=send_post_request("{}/v2.1/servers/{}/action".format(nova_ep, server_id), token, payload)
-    print(response.text)
-    logging.info(response.text)
+    logging.debug(response.text)
+    #logging.info(response.text)
     return response.status_code
 
 def search_and_create_server(nova_ep, token, server_name, image_id, key_name, flavor_id,  network_id, security_group_id, host=None, availability_zone= None):
     server_id= search_server(nova_ep, token, server_name)
     if server_id is None:
-        time.sleep(10)
+        time.sleep(5)
         server_url= create_server(nova_ep, token, server_name, image_id, key_name, flavor_id,  network_id, security_group_id, host, availability_zone)
         time.sleep(5)
         server_id= get_server_detail(token, server_url)
@@ -598,7 +598,7 @@ def create_floating_ip(neutron_ep, token, network_id, subnet_id, server_ip_addre
              } 
     time.sleep(10)
     response= send_post_request("{}/v2.0/floatingips".format(neutron_ep), token, payload)
-    print(response.text)
+    logging.debug(response.text)
     logging.info("successfully assigned floating ip to server") if response.ok else response.raise_for_status()
     data= response.json()
     return data["floatingip"]["floating_ip_address"], data["floatingip"]["id"]
@@ -610,7 +610,7 @@ def create_floatingip_wo_port(neutron_ep, token, network_id ):
         }
     response= send_post_request("{}//v2.0/floatingips".format(neutron_ep), token, payload)
     time.sleep(10)
-    print(response.text)
+    logging.debug(response.text)
     data=response.json()
     logging.info("successfully created floating ip") if response.ok else response.raise_for_status()
     return data["floatingip"]["floating_ip_address"], data["floatingip"]["id"]
@@ -621,19 +621,19 @@ def assign_ip_to_port(neutron_ep, token, port_id, floatingip_id ):
             }
         }
     response= send_put_request("{}/v2.0/floatingips/{}".format(neutron_ep, floatingip_id), token, payload)
-    print(response.text)
+    logging.debug(response.text)
     time.sleep(10)
     logging.info("successfully assigned floating to port") if response.ok else response.raise_for_status()
 
 def attach_volume_to_server( nova_ep, token, project_id, server_id, volume_id, mount_point):
     payload= {"volumeAttachment": {"volumeId": volume_id}}
     response= requests.post("{}/v2.1/servers/{}/os-volume_attachments".format(nova_ep, server_id), headers= {'content-type': "application/json", 'X-Auth-Token': token}, data=json.dumps(payload))
-    print(response.text)
+    logging.debug(response.text)
     logging.info("volume successfully attached to server") if response.ok else response.raise_for_status()
 
 def search_volume(storage_ep, token, volume_name, project_id):
     response= send_get_request("{}/v3/{}/volumes".format(storage_ep, project_id), token)
-    print(response.text)
+    logging.debug(response.text)
     logging.info("successfully received volume list") if response.ok else response.raise_for_status()
     return parse_json_to_search_resource(response, "volumes", "name",volume_name, "id")
 
@@ -643,7 +643,7 @@ Volume
 
 def get_volume_metadata(storage_ep, token, volume_id, project_id):
     response= send_get_request("{}/v3/{}/volumes/{}".format(storage_ep, project_id,volume_id), token)
-    print(response.text)
+    logging.debug(response.text)
     logging.info("successfully received volume list") if response.ok else response.raise_for_status()
     data= response.json()
 
@@ -663,17 +663,17 @@ def create_volume(storage_ep, token, project_id, volume_name, volume_size, image
         payload= {"volume":{**payload["volume"], **payload2}}
     response= requests.post("{}/v3/{}/volumes".format(storage_ep, project_id), headers= {'content-type': "application/json", 'X-Auth-Token': token}, data=json.dumps(payload))
     logging.debug(response.text)
-    print(response.text)
+    logging.debug(response.text)
     logging.info("successfully created volume {}".format(volume_name)) if response.ok else response.raise_for_status()
     data= response.json()
     return data["volume"]["id"]
 def upscale_voume(storage_ep, token, project_id, volume_id, volume_size):
     payload= {"os-extend": {"new_size": volume_size}}
     response= requests.post("{}/v3/{}/volumes/{}/action".format(storage_ep, project_id, volume_id), headers= {'content-type': "application/json", 'X-Auth-Token': token}, data=json.dumps(payload))
-    print(response.text)
+    logging.debug(response.text)
     if(response.status_code ==202):
         logging.debug(response.text)
-        print(response.text)
+        #print(response.text)
         logging.info("successfully updated  volume") if response.ok else response.raise_for_status()
         return True
     else:
@@ -686,10 +686,10 @@ def migrate_voume(storage_ep, token, project_id, volume_id):
     }
     #payload= {"os-extend": {"new_size": volume_size}}
     response= requests.post("{}/v3/{}/volumes/{}/action".format(storage_ep, project_id, volume_id), headers= {'content-type': "application/json", 'X-Auth-Token': token}, data=json.dumps(payload))
-    print(response.text)
+    logging.debug(response.text)
     if(response.status_code ==202):
         logging.debug(response.text)
-        print(response.text)
+        #print(response.text)
         logging.info("successfully migrated  volume") if response.ok else response.raise_for_status()
         return True
     else:
@@ -713,7 +713,7 @@ def create_volume_snapshot(storage_ep, token, project_id, volume_id, snapshot_na
             }
     response= requests.post("{}/v3/{}/snapshots".format(storage_ep, project_id), headers= {'content-type': "application/json", 'X-Auth-Token': token}, data=json.dumps(payload))
     logging.debug(response.text)
-    print(response.text)
+    #print(response.text)
     if(response.status_code == 202):
         logging.info("successfully created snapshot {}".format(snapshot_name)) if response.ok else response.raise_for_status()
         data= response.json()
@@ -730,7 +730,7 @@ def replicate_volume(storage_ep, token, project_id, volume_name, source_id):
             }
     response= requests.post("{}/v3/{}/volumes".format(storage_ep, project_id), headers= {'content-type': "application/json", 'X-Auth-Token': token}, data=json.dumps(payload))
     logging.debug(response.text)
-    print(response.text)
+    #print(response.text)
     if(response.status_code== 202):
         logging.info("successfully replicated volume {}".format(volume_name)) if response.ok else response.raise_for_status()
         data= response.json()
@@ -747,7 +747,7 @@ def create_volume_from_snapshot(storage_ep, token, project_id, volume_name, snap
             }
     response= requests.post("{}/v3/{}/volumes".format(storage_ep, project_id), headers= {'content-type': "application/json", 'X-Auth-Token': token}, data=json.dumps(payload))
     logging.debug(response.text)
-    print(response.text)
+    #print(response.text)
     if(response.status_code== 202):
         logging.info("successfully created volume {}".format(volume_name)) if response.ok else response.raise_for_status()
         data= response.json()
@@ -837,7 +837,7 @@ def create_loadbalancer(loadbal_ep, token, loadbalancer_name, subnet_id):
         }
 
     response= send_post_request('{}/v2.0/lbaas/loadbalancers'.format(loadbal_ep), token, payload)
-    print(response.text)
+    logging.debug(response.text)
     logging.info("successfully created loadbalancer {}".format(loadbalancer_name)) if response.ok else response.raise_for_status()
     data=response.json()
     return data['loadbalancer']['id']
@@ -849,12 +849,12 @@ def search_loadbalancer(loadbal_ep, token, loadbalancer_name):
 
 def check_loadbalancer_status(loadbal_ep, token, loadbalancer_id):
     response = send_get_request("{}/v2.0/lbaas/loadbalancers/{}".format(loadbal_ep, loadbalancer_id), token)
-    print(response.text)
+    logging.debug(response.text)
     data= response.json()
     return data["loadbalancer"]["provisioning_status"] if response.ok else response.raise_for_status()
 def check_loadbalancer_vipport(loadbal_ep, token, loadbalancer_id):
     response = send_get_request("{}/v2.0/lbaas/loadbalancers/{}".format(loadbal_ep, loadbalancer_id), token)
-    print(response.text)
+    logging.debug(response.text)
     data= response.json()
     return data["loadbalancer"]["vip_port_id"] if response.ok else response.raise_for_status()
 
@@ -878,7 +878,7 @@ def create_listener(loadbal_ep, token, listener_name, loadbalancerid, protocol, 
         }
     try:
         response= send_post_request('{}/v2.0/lbaas/listeners'.format(loadbal_ep), token, payload)
-        print(response.text)
+        logging.debug(response.text)
         logging.info("successfully created loadbalancer {}".format(listener_name)) if response.ok else response.raise_for_status()
         data=response.json()
         return data['listener']['id']
@@ -921,7 +921,7 @@ def create_pool(loadbal_ep, token, pool_name, listenerid, loadbalancerid, protoc
         payload= {"pool":{**payload["pool"], **payload_session}}
     try:
         response= send_post_request('{}/v2.0/lbaas/pools'.format(loadbal_ep), token, payload)
-        print(response.text)
+        logging.debug(response.text)
         logging.info("successfully created loadbalancer {}".format(pool_name)) if response.ok else response.raise_for_status()
         data=response.json()
         return data['pool']['id']
@@ -935,7 +935,7 @@ def search_pool(loadbal_ep, token, listener_name):
 
 def check_pool_status(loadbal_ep, token, listener_id):
     response = send_get_request("{}/v2.0/lbaas/pools/{}".format(loadbal_ep, listener_id), token)
-    print(response.text)
+    logging.debug(response.text)
     data= response.json()
     return data["pool"]["provisioning_status"] if response.ok else response.raise_for_status()
 def search_and_create_pool(loadbal_ep, token, pool_name, listener_id, loadbalancerid, protocol, algorithm):
@@ -979,7 +979,7 @@ def create_loadbalancer_floatingip(neutron_ep, token, network_id ):
             }
         }
     response= send_post_request("{}//v2.0/floatingips".format(neutron_ep), token, payload)
-    print(response.text)
+    logging.debug(response.text)
     data=response.json()
     logging.info("successfully created floating ip for load balancer") if response.ok else response.raise_for_status()
     return data["floatingip"]["id"], data["floatingip"]["floating_ip_address"]
@@ -990,11 +990,11 @@ def assign_lb_floatingip(neutron_ep, token, port_id, floatingip_id ):
             }
         }
     response= send_put_request("{}/v2.0/floatingips/{}".format(neutron_ep, floatingip_id), token, payload)
-    print(response.text)
+    logging.debug(response.text)
     logging.info("successfully assigned floating ip to vip port") if response.ok else response.raise_for_status()
 def get_pool_member(loadbal_ep, token, pool_id):
     response = send_get_request("{}/v2.0/lbaas/pools/{}".format(loadbal_ep, pool_id), token)
-    print(response.text)
+    logging.debug(response.text)
     data= response.json()
     logging.info("successfully assigned member of pool") if response.ok else response.raise_for_status()
     return data["pool"]["members"][0]["id"] 
@@ -1006,7 +1006,7 @@ def down_pool_member(loadbal_ep, token, pool_id, member_id ):
         }
     response= send_put_request("{}/v2.0/lbaas/pools/{}/members/{}".format(loadbal_ep, pool_id, member_id), token, payload)
     time.sleep(5)
-    print(response.text)
+    logging.debug(response.text)
     logging.info("successfully down a member in pool") if response.ok else response.raise_for_status()
 def up_pool_member(loadbal_ep, token, pool_id, member_id ):
     time.sleep(5)
@@ -1016,7 +1016,7 @@ def up_pool_member(loadbal_ep, token, pool_id, member_id ):
             }
         }
     response= send_put_request("{}/v2.0/lbaas/pools/{}/members/{}".format(loadbal_ep, pool_id, member_id), token, payload)
-    print(response.text)
+    logging.debug(response.text)
     time.sleep(5)
     logging.info("successfully up a member in pool") if response.ok else response.raise_for_status()
 def disable_loadbalancer(loadbal_ep, token, loadbalancer_id ):
@@ -1027,7 +1027,7 @@ def disable_loadbalancer(loadbal_ep, token, loadbalancer_id ):
         }
     response= send_put_request("{}/v2.0/loadbalancers/{}".format(loadbal_ep, loadbalancer_id), token, payload)
     time.sleep(30)
-    print(response.text)
+    logging.debug(response.text)
     logging.info("successfully disabled loadbalancer") if response.ok else response.raise_for_status()
 def enable_loadbalancer(loadbal_ep, token, loadbalancer_id ):
     payload= {
@@ -1037,11 +1037,11 @@ def enable_loadbalancer(loadbal_ep, token, loadbalancer_id ):
         }
     response= send_put_request("{}/v2.0/loadbalancers/{}".format(loadbal_ep, loadbalancer_id), token, payload)
     time.sleep(30)
-    print(response.text)
+    logging.debug(response.text)
     logging.info("successfully disabled loadbalancer") if response.ok else response.raise_for_status()
 def check_loadbalancer_operating_status(loadbal_ep, token, loadbalancer_id):
     response = send_get_request("{}/v2.0/lbaas/loadbalancers/{}".format(loadbal_ep, loadbalancer_id), token)
-    print(response.text)
+    logging.debug(response.text)
     data= response.json()
     return data["loadbalancer"]["operating_status"] if response.ok else response.raise_for_status()
 
@@ -1057,7 +1057,7 @@ def create_l7policy(loadbal_ep, token, policy_name, listener_id):
             }
         }
     response= send_post_request('{}/v2.0/lbaas/l7policies'.format(loadbal_ep), token, payload)
-    print(response.text)
+    logging.debug(response.text)
     logging.info("successfully created l7policy {}".format(policy_name)) if response.ok else response.raise_for_status()
 
 def create_l7policy(loadbal_cdep, token, policy_id):
@@ -1071,7 +1071,7 @@ def create_l7policy(loadbal_cdep, token, policy_id):
             }
         }
     response= send_post_request('{}/v2.0/lbaas/l7policies/{}/rules'.format(loadbal_ep, policy_id), token, payload)
-    print(response.text)
+    logging.debug(response.text)
     logging.info("successfully added rule to policy {}".format(policy_id)) if response.ok else response.raise_for_status()
 #BArbican
 def add_key_to_store(barbican_ep, token, key):
@@ -1130,7 +1130,7 @@ def create_secret(barbican_ep, token, name, payload):
                 "payload_content_type": "text/plain"}
 
     response= send_post_request("{}/v1/secrets/".format(barbican_ep), token, payload)
-    print(response.text)
+    logging.debug(response.text)
     print(response.status_code)
     if (response.status_code==201):
         key_id= str(response.text)
@@ -1163,21 +1163,21 @@ def update_secret(barbican_ep, token, url, data):
         return False
 def get_secret(barbican_ep, token, secret_id):
     response= send_get_request("{}/v1/secrets/{}".format(barbican_ep,secret_id), token)
-    print(response.text)
+    logging.debug(response.text)
     if response.status_code==200:
         return response.text
     else:
         return None 
 def get_key(barbican_ep, token, secret_id):
     response= send_get_request("{}/v1/orders/{}".format(barbican_ep,secret_id), token)
-    print(response.text)
+    logging.debug(response.text)
     if response.status_code==200:
         return response.text
     else:
         return None 
 def get_payload(barbican_ep, token, secret_id):
     response= send_get_request("{}/v1/secrets/{}/payload".format(barbican_ep,secret_id), token)
-    print(response.text)
+    logging.debug(response.text)
     return response.text
 
 #
@@ -1231,7 +1231,7 @@ def wait_instance_ssh(ip, settings):
             logging.info("Waiting for server to ssh")
             time.sleep(30)
         retries=retries+1
-        if(retries==4):
+        if(retries==2):
             break
     return ssh
 def instance_ssh(server1, settings, command):

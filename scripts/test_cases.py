@@ -28,7 +28,7 @@ if not os.path.exists('logs'):
 
 
 log_file= "logs/"+ time.strftime("%d-%m-%Y-%H-%M-%S")+".log"
-logging.basicConfig(level=logging.INFO,
+logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s %(message)s',
                     handlers=[logging.FileHandler(log_file),
                               logging.StreamHandler()])
@@ -691,7 +691,7 @@ def sriov_test_cases(nova_ep, neutron_ep, image_ep, cinder_ep, keystone_ep, barb
         failed=failed+1
         t20="Failed"
     if(volume== True):
-        volume_passed, volume_message= volume_volume_test_case(nova_ep, neutron_ep, image_ep, cinder_ep, keystone_ep, token, settings, baremetal_nodes_ips, network1_id, security_group_id, image_id)
+        volume_passed, volume_message= sriov_volume_test_case(nova_ep, neutron_ep, image_ep, cinder_ep, keystone_ep, token, settings, baremetal_nodes_ips, network1_id, security_group_id, image_id)
     #Changing qouta to default settings
     logging.info("cleaning resources")
     delete_setup( token, nova_ep, image_ep, neutron_ep, network1_id, network2_id, subnet1_id, subnet2_id, router_id, image_id, flavor_id, settings)
