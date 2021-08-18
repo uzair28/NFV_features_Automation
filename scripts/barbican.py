@@ -10,61 +10,6 @@ import subprocess
 from volume import *
 
 
-
-'''
-def server_build_wait(nova_ep, token, server_ids):
-    while True:
-        flag=0
-        for server in server_ids:
-            status= check_server_status(nova_ep, token, server)
-            print(status)
-            if not (status == "active" or status=="error"):
-                logging.info("Waiting for server/s to build")
-                flag=1
-                time.sleep(10)
-        if flag==0:
-            break
-def wait_instance_boot(ip):
-    retries=0
-    while(1):
-        response = os.system("ping -c 3 " + ip)
-        if response == 0:
-            logging.info ("Ping successfull!")
-            break 
-            return True
-        logging.info("Waiting for server to boot")
-        time.sleep(30)
-        retries=retries+1
-        if(retries==10):
-            break
-            return False
-def ssh_conne(server1, server2, settings):
-    try:
-        command= "ssh-keygen -R {}".format(server1)
-        os.system(command)
-    except:
-        pass
-    try:
-        command= "ping  -c 3 {}".format(server2)
-        client= paramiko.SSHClient()
-        paramiko.AutoAddPolicy()
-        client.load_system_host_keys()
-        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        client.connect(server1, port=22, username="centos", key_filename=os.path.expanduser(settings["key_file"]))
-        logging.info("SSH Session is established")
-        logging.info("Running command in a compute node")
-        stdin, stdout, stderr = client.exec_command(command)
-        logging.info("command {} successfully executed on compute node {}".format(command, server2))
-        output= stdout.read().decode('ascii')
-        error= stderr.read().decode('ascii')
-        return output, error
-    except Exception as e:
-        logging.exception(e)
-        logging.error("error ocurred when making ssh connection and running command on remote server") 
-    finally:
-        client.close()
-        logging.info("Connection from client has been closed")  
-'''
 def create_ssl_certificate(settings):
     logging.info("Generating Certificate")
     os.popen("openssl genrsa -out ~/testcase_private_key.pem 1024")
@@ -206,7 +151,7 @@ def barbican_test_case_6_7_8_9(keystone_ep, cinder_ep, nova_ep, neutron_ep, imag
             message6= "Barbican testcase 6 passed, image signature successfully validated, image status is {}".format(status)
             
             #creating server
-            server_1_id= search_and_create_server(nova_ep, token, "barbican_server", image_id, settings["key_name"], flavor_id,  network_id, security_group_id)
+            server_1_id= search_and_create_server(nova_ep, token, settings["server_1_name"], image_id, settings["key_name"], flavor_id,  network_id, security_group_id)
             server_build_wait(nova_ep, token, [server_1_id])
             status1= check_server_status(nova_ep, token, server_1_id)
             if  status1 == "error":
@@ -314,3 +259,60 @@ def barbican_volume_test_case(nova_ep, neutron_ep, image_ep, cinder_ep, keystone
             delete_resource("{}/v2.0/floatingips/{}".format(neutron_ep, floating_1_ip_id), token)
     
     return testcases_passed, message
+
+
+
+'''
+def server_build_wait(nova_ep, token, server_ids):
+    while True:
+        flag=0
+        for server in server_ids:
+            status= check_server_status(nova_ep, token, server)
+            print(status)
+            if not (status == "active" or status=="error"):
+                logging.info("Waiting for server/s to build")
+                flag=1
+                time.sleep(10)
+        if flag==0:
+            break
+def wait_instance_boot(ip):
+    retries=0
+    while(1):
+        response = os.system("ping -c 3 " + ip)
+        if response == 0:
+            logging.info ("Ping successfull!")
+            break 
+            return True
+        logging.info("Waiting for server to boot")
+        time.sleep(30)
+        retries=retries+1
+        if(retries==10):
+            break
+            return False
+def ssh_conne(server1, server2, settings):
+    try:
+        command= "ssh-keygen -R {}".format(server1)
+        os.system(command)
+    except:
+        pass
+    try:
+        command= "ping  -c 3 {}".format(server2)
+        client= paramiko.SSHClient()
+        paramiko.AutoAddPolicy()
+        client.load_system_host_keys()
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        client.connect(server1, port=22, username="centos", key_filename=os.path.expanduser(settings["key_file"]))
+        logging.info("SSH Session is established")
+        logging.info("Running command in a compute node")
+        stdin, stdout, stderr = client.exec_command(command)
+        logging.info("command {} successfully executed on compute node {}".format(command, server2))
+        output= stdout.read().decode('ascii')
+        error= stderr.read().decode('ascii')
+        return output, error
+    except Exception as e:
+        logging.exception(e)
+        logging.error("error ocurred when making ssh connection and running command on remote server") 
+    finally:
+        client.close()
+        logging.info("Connection from client has been closed")  
+'''

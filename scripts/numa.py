@@ -8,7 +8,6 @@ def parse_vcpus(output):
     output= output.split('>')
     return output[1][0]
 
-
 def numa_test_case_3(nova_ep, neutron_ep, image_ep, token, settings, baremetal_node_ips,  keypair_public_key, network_id, subnet_id, security_group_id, image_id):
     logging.info("Test Case 3 running")
     isPassed= False
