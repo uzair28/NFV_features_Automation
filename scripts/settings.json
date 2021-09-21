@@ -15,8 +15,8 @@
     "external_network_name": "public",
     "external_subnet": "external_sub",
 
-    "image_name": "testcase_image",
-    "image_file": "~/CentOS-7-x86_64-GenericCloud.qcow2",
+    "image_name": "test_case_image",
+    "image_file": "~/CentOS-8-GenericCloud-8.3.2011-20201204.2.x86_64.qcow2",
     
     "flavor1": "testing_flavor",
     "flavor2": "testing_flavor2",
